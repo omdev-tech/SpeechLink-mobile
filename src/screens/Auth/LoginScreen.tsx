@@ -89,7 +89,7 @@ const LoginScreen: React.FC = () => {
       }
       
       // Update auth context with the received token
-      await signIn(token);
+      await signIn(token, response);
     } catch (error) {
       console.error('Login error:', error);
       

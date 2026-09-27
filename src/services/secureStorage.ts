@@ -15,6 +15,8 @@ import { Platform } from 'react-native';
 
 export const ACCESS_TOKEN_KEY = 'auth_token';
 export const REFRESH_TOKEN_KEY = 'refresh_token';
+/** Access-token expiry bookkeeping (not secret: AsyncStorage). Written/cleared with the token. */
+export const TOKEN_META_KEY = 'auth_token_meta';
 
 const TOKEN_KEYS = [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY];
 // Plaintext AsyncStorage keys that ever held secrets (code_verifier: old PKCE LoginScreen).
@@ -327,8 +329,39 @@ async function write(key: string, value: string): Promise<void> {
   if (!isWeb()) await AsyncStorage.removeItem(key); // never leave a plaintext twin behind
 }
 
+/**
+ * Expiry of the stored access token. Times are unix SECONDS.
+ * `estimated` = the server did not say (pre-expires_at backend): expiresAt is a conservative guess.
+ */
+export type TokenMeta = { expiresAt: number; obtainedAt: number; estimated: boolean };
+
+/** @returns the stored token expiry, or null when unknown (e.g. a token issued before expiry tracking). */
+export async function getTokenMeta(): Promise<TokenMeta | null> {
+  try {
+    const raw = await AsyncStorage.getItem(TOKEN_META_KEY);
+    if (!raw) return null;
+    const meta = JSON.parse(raw);
+    if (typeof meta?.expiresAt !== 'number' || typeof meta?.obtainedAt !== 'number') return null;
+    return { expiresAt: meta.expiresAt, obtainedAt: meta.obtainedAt, estimated: !!meta.estimated };
+  } catch {
+    return null; // unreadable == unknown: the caller refreshes, which rewrites it
+  }
+}
+
+export async function setTokenMeta(meta: TokenMeta | null): Promise<void> {
+  if (meta) await AsyncStorage.setItem(TOKEN_META_KEY, JSON.stringify(meta));
+  else await AsyncStorage.removeItem(TOKEN_META_KEY);
+}
+
 export const getToken = () => read(ACCESS_TOKEN_KEY);
-export const setToken = (token: string) => write(ACCESS_TOKEN_KEY, token);
+/**
+ * Store the access token together with its expiry. Without `meta` any previous expiry is dropped,
+ * so a stale expiry can never be attributed to a different token.
+ */
+export async function setToken(token: string, meta?: TokenMeta): Promise<void> {
+  await write(ACCESS_TOKEN_KEY, token);
+  await setTokenMeta(meta ?? null);
+}
 export const getRefreshToken = () => read(REFRESH_TOKEN_KEY);
 export const setRefreshToken = (token: string) => write(REFRESH_TOKEN_KEY, token);
 
@@ -339,7 +372,7 @@ export async function clearTokens(): Promise<void> {
   for (const key of TOKEN_KEYS) {
     await withLock(key, () => (isWeb() ? AsyncStorage.removeItem(key) : resetKey(key)));
   }
-  await AsyncStorage.multiRemove(LEGACY_SECRET_KEYS);
+  await AsyncStorage.multiRemove([...LEGACY_SECRET_KEYS, TOKEN_META_KEY]);
 }
 
 /** Test-only: forget that the migration already ran. */

@@ -20,6 +20,11 @@ export interface AuthResponse {
   accessToken?: string;
   token?: string;
   access_token?: string;
+  token_type?: string;
+  /** Token lifetime in seconds (backend >= session-revocation release). */
+  expires_in?: number;
+  /** Token expiry, unix seconds (backend >= session-revocation release). */
+  expires_at?: number;
   refreshToken?: string;
   error?: string;
 }
