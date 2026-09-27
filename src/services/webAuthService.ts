@@ -1,6 +1,6 @@
 import { API_CONFIG } from '../config/api';
 import * as WebBrowser from 'expo-web-browser';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from './secureStorage';
 
 /**
  * Service for opening web pages with automatic authentication
@@ -28,7 +28,7 @@ class WebAuthService {
       console.log(`Opening authenticated web page: ${path}`);
       
       // Get the user's auth token
-      const authToken = await AsyncStorage.getItem('auth_token');
+      const authToken = await getToken();
       
       if (!authToken) {
         throw new Error('User not authenticated');

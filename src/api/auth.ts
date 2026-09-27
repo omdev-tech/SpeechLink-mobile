@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as secureStorage from '../services/secureStorage';
 import { API_CONFIG } from '../config/api';
 import { 
   LoginCredentials, 
@@ -22,7 +22,7 @@ const apiClient = axios.create({
 
 // Add auth token to requests
 apiClient.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('auth_token');
+  const token = await secureStorage.getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -66,7 +66,7 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
       console.log('Successfully stored authentication tokens after login');
     } else if (responseData.accessToken) {
       // If we only have access token, just store that
-      await AsyncStorage.setItem('auth_token', responseData.accessToken);
+      await secureStorage.setToken(responseData.accessToken);
       console.log('Stored only access token (no refresh token)');
     } else {
       console.warn('No tokens received in login response');
@@ -124,7 +124,7 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
       console.log('Successfully stored authentication tokens after registration');
     } else if (responseData.accessToken) {
       // If we only have access token, just store that
-      await AsyncStorage.setItem('auth_token', responseData.accessToken);
+      await secureStorage.setToken(responseData.accessToken);
       console.log('Stored only access token (no refresh token)');
     } else {
       console.warn('No tokens received in registration response');
@@ -197,14 +197,14 @@ export const logout = async () => {
     await apiClient.post('/api/auth/mobile/logout');
     
     // Clear tokens from storage
-    await AsyncStorage.multiRemove(['auth_token', 'refresh_token']);
+    await secureStorage.clearTokens();
     
     return { success: true };
   } catch (error) {
     console.error('Logout failed:', error);
     
     // Even if the API call fails, clear tokens locally
-    await AsyncStorage.multiRemove(['auth_token', 'refresh_token']);
+    await secureStorage.clearTokens();
     
     throw error;
   }
@@ -222,13 +222,13 @@ const storeAuthTokens = async (accessToken?: string | null, refreshToken?: strin
   
   try {
     if (accessToken) {
-      await AsyncStorage.setItem('auth_token', accessToken);
+      await secureStorage.setToken(accessToken);
     } else {
       console.warn('Attempted to store null/undefined access token');
     }
     
     if (refreshToken) {
-      await AsyncStorage.setItem('refresh_token', refreshToken);
+      await secureStorage.setRefreshToken(refreshToken);
     }
   } catch (error) {
     console.error('Error storing auth tokens:', error);

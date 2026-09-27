@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as secureStorage from './secureStorage';
 import { API_CONFIG } from '../config/api';
 import { 
   login, 
@@ -14,9 +14,6 @@ import {
   AuthResponse, 
   PasswordResetConfirm 
 } from '../types/auth';
-
-const ACCESS_TOKEN_KEY = 'auth_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
 
 export interface AuthToken {
   access_token: string;
@@ -265,7 +262,7 @@ class AuthService {
     }
 
     try {
-      const storedToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      const storedToken = await secureStorage.getToken();
       if (storedToken) {
         this.token = { access_token: storedToken, token_type: 'bearer' };
         return this.token;
@@ -291,7 +288,7 @@ class AuthService {
         hasExpiresIn: !!token.expires_in,
       });
       
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token.access_token);
+      await secureStorage.setToken(token.access_token);
     } catch (error) {
       console.error('Error saving token:', error);
     }
@@ -299,8 +296,8 @@ class AuthService {
 
   public async clearToken(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
       this.token = null;
+      await secureStorage.clearTokens();
     } catch (error) {
       console.error('Error clearing token:', error);
     }

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { apiService } from './apiService';
+import { clearTokens } from './secureStorage';
 
 /**
  * Service to handle complete app state reset
@@ -25,6 +26,8 @@ class ResetService {
     try {
       console.log('Clearing all AsyncStorage data...');
       await AsyncStorage.clear();
+      // Auth tokens live in SecureStore, not AsyncStorage — a full reset must drop them too.
+      await clearTokens();
       console.log('AsyncStorage cleared successfully');
     } catch (error) {
       console.error('Failed to clear AsyncStorage:', error);
