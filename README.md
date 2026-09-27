@@ -25,6 +25,15 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Native project (android/) is committed
+
+`android/` is checked in on purpose: it carries the custom `AudioOutput` native module
+(re-applied by `app.plugin.js` from `plugins/audio-output/`). Because the native folder exists,
+EAS Build does **not** sync native fields from `app.json` (orientation, icon, splash, scheme,
+`android`, `plugins`, ...). After changing any of them, run `npx expo prebuild -p android`
+and commit the regenerated `android/`. This is also why expo-doctor's
+`appConfigFieldsNotSyncedCheck` is disabled in `package.json`.
+
 ## Get a fresh project
 
 When you're ready, run:

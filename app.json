@@ -34,7 +34,7 @@
     "owner": "naqued",
     "android": {
       "package": "com.naqued.speechlinkmobile",
-      "versionCode": 39,
+      "versionCode": 40,
       "permissions": [
         "INTERNET",
         "MODIFY_AUDIO_SETTINGS",
@@ -45,23 +45,11 @@
         "foregroundImage": "./assets/favicon.png",
         "backgroundColor": "#4A6FEA"
       },
-      "edgeToEdgeEnabled": true,
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "minSdkVersion": 24,
-      "buildToolsVersion": "35.0.0",
-      "manifest": {
-        "application": {
-          "android:supports16KbPages": true
-        }
-      }
+      "edgeToEdgeEnabled": true
     },
     "ios": {
       "bundleIdentifier": "com.naqued.speechlinkmobile",
       "supportsTablet": true
-    },
-    "cli": {
-      "appVersionSource": "remote"
     },
     "plugins": [
       "./app.plugin.js",
@@ -72,27 +60,13 @@
             "useNewNdkIntegration": true,
             "useLegacyPackaging": false,
             "minSdkVersion": 24,
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "buildToolsVersion": "35.0.0",
-            "ndkVersion": "27.0.12077973"
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
           }
         }
-      ]
-    ],
-    "doctor": {
-      "reactNativeDirectoryCheck": {
-        "exclude": [
-          "react-native-audio-recorder-player",
-          "react-native-fs",
-          "react-native-sound",
-          "@expo/metro-runtime",
-          "i18next",
-          "socket.io-client",
-          "@naqued/speech-link-mobile"
-        ],
-        "listUnknownPackages": false
-      }
-    }
+      ],
+      "expo-font"
+    ]
   }
 }

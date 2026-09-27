@@ -55,14 +55,6 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     bootstrapAsync();
   }, []);
 
-  // Clean up any active auth polls when component unmounts
-  useEffect(() => {
-    return () => {
-      // Stop Google auth polling
-      googleAuthService.stopPolling();
-    };
-  }, []);
-
   const signIn = async (token: string) => {
     try {
       if (!token) {

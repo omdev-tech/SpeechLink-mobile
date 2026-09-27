@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { sttService, TranscriptionResult } from '../services/sttService';
 
 export interface UseSpeechToTextResult {

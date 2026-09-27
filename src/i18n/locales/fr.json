@@ -135,7 +135,12 @@
     "noChannelsFound": "Aucun canal vocal trouvé sur ce serveur",
     "createVoiceChannel": "Assurez-vous que ce serveur dispose d'au moins un canal vocal",
     "joinVoice": "Rejoindre le Canal Vocal",
-    "leaveVoice": "Quitter le Canal Vocal"
+    "leaveVoice": "Quitter le Canal Vocal",
+    "refreshConnection": "Rafraîchir la connexion",
+    "refreshConfirmTitle": "Rafraîchir la connexion Discord",
+    "refreshConfirmMessage": "Vous allez devoir vous reconnecter à Discord pour renouveler l'accès de SpeechLink. Votre serveur et votre canal restent sélectionnés. Continuer ?",
+    "refreshConfirmAction": "Rafraîchir",
+    "refreshFailed": "Échec du rafraîchissement de la connexion Discord. Veuillez réessayer."
   },
   "home": {
     "title": "Amplificateur Vocal",

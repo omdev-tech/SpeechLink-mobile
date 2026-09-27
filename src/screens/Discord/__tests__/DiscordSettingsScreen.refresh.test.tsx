@@ -1,0 +1,119 @@
+import { mockDiscord, resetDiscordMock, autoPressAlert, AUTH_URL } from '../../../test-utils/discordScreenMocks';
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import * as WebBrowser from 'expo-web-browser';
+import DiscordSettingsScreen from '../DiscordSettingsScreen';
+
+const REDIRECT = 'com.naqued.speechlinkmobile://discord-callback';
+const openAuthSession = WebBrowser.openAuthSessionAsync as jest.Mock;
+const openBrowser = WebBrowser.openBrowserAsync as jest.Mock;
+
+/** URL of whichever in-app browser API the screen used to start Discord OAuth. */
+const openedUrls = () => [...openAuthSession.mock.calls, ...openBrowser.mock.calls].map((c) => c[0]);
+
+describe('DiscordSettingsScreen - "Refresh connection" (re-authenticate Discord)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Account linked on the server (row exists), but its tokens were lost server-side.
+    resetDiscordMock({ isAuthenticated: true, isConnected: false });
+    openAuthSession.mockResolvedValue({ type: 'cancel' });
+    openBrowser.mockResolvedValue({ type: 'cancel' });
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('is offered as soon as the Discord account is linked, even when not in a voice channel', async () => {
+    const screen = render(<DiscordSettingsScreen />);
+    expect(await screen.findByText('discord.refreshConnection')).toBeTruthy();
+  });
+
+  it('is not offered when no Discord account is linked', async () => {
+    resetDiscordMock({ isAuthenticated: false });
+    const screen = render(<DiscordSettingsScreen />);
+    await screen.findByText('discord.linkAccount');
+    expect(screen.queryByText('discord.refreshConnection')).toBeNull();
+  });
+
+  it('re-runs Discord OAuth although isAuthenticated is true, and only trusts a freshly claimed code', async () => {
+    // Visible in both the WIP (isConnected-gated) and the fixed screen.
+    mockDiscord.isConnected = true;
+    const alertSpy = autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({
+      type: 'success',
+      url: 'com.naqued.speechlinkmobile://discord-callback?status=success&tempKey=t',
+    });
+
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+
+    // The OAuth flow must start: auth URL fetched and opened in the in-app browser.
+    await waitFor(() => expect(mockDiscord.getDiscordAuthUrl).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(openedUrls()).toEqual([AUTH_URL]));
+
+    // The claim must not be satisfied by the pre-existing (stale) link.
+    await waitFor(() =>
+      expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ requireFreshAuth: true })
+      )
+    );
+
+    // Leaving the voice channel is not an account unlink and is not part of re-auth.
+    expect(mockDiscord.disconnect).not.toHaveBeenCalled();
+    // Confirmation dialog shown first.
+    expect(alertSpy.mock.calls[0][0]).toBe('discord.refreshConfirmTitle');
+  });
+
+  it('does nothing when the user cancels the confirmation', async () => {
+    autoPressAlert('cancel');
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockDiscord.getDiscordAuthUrl).not.toHaveBeenCalled();
+    expect(openedUrls()).toEqual([]);
+  });
+
+  it('success redirect with tempKey (older backend): the claim requires a fresh auth', async () => {
+    autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success&tempKey=fresh` });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1));
+    const [, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
+    expect(options).toMatchObject({ requireFreshAuth: true, tempKey: 'fresh', linked: false });
+  });
+
+  it('success redirect with linked=1 (new backend): refresh succeeds and settings are reloaded', async () => {
+    const alertSpy = autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success&linked=1` });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(alertSpy.mock.calls.map((c) => c[0])).toContain('discord.authSuccess'));
+    const [, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
+    expect(options).toMatchObject({ linked: true, requireFreshAuth: true });
+    expect(alertSpy.mock.calls.map((c) => c[0])).not.toContain('discord.authFailed');
+  });
+
+  it('bare status=success (neither linked=1 nor tempKey) on refresh cannot prove fresh tokens', async () => {
+    const alertSpy = autoPressAlert('destructive');
+    // What the real service answers for requireFreshAuth without key/code/linked.
+    mockDiscord.handleDiscordCallback.mockImplementation(async (_c: string, o: any) => !o.requireFreshAuth || !!o.linked || !!o.tempKey);
+    openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success` });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(alertSpy.mock.calls.map((c) => c[0])).toContain('discord.authFailed'));
+    const [, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
+    expect(options).toMatchObject({ requireFreshAuth: true, linked: false });
+    expect(options.tempKey).toBeUndefined();
+  });
+
+  it('cancel/dismiss during a refresh: nothing can prove fresh auth, so no claim request at all', async () => {
+    autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({ type: 'dismiss' });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(openAuthSession).toHaveBeenCalled());
+    await waitFor(() => expect(mockDiscord.loadSettings).toHaveBeenCalledTimes(2)); // mount + resync
+    expect(mockDiscord.handleDiscordCallback).not.toHaveBeenCalled();
+  });
+});

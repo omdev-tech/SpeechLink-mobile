@@ -1,5 +1,5 @@
 import { apiService } from './apiService';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { authService } from './authService';
 import { API_CONFIG } from '../config/api';
 import { Audio } from 'expo-av';
