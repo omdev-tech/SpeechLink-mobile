@@ -333,7 +333,13 @@ async function write(key: string, value: string): Promise<void> {
  * Expiry of the stored access token. Times are unix SECONDS.
  * `estimated` = the server did not say (pre-expires_at backend): expiresAt is a conservative guess.
  */
-export type TokenMeta = { expiresAt: number; obtainedAt: number; estimated: boolean };
+export type TokenMeta = {
+  expiresAt: number;
+  obtainedAt: number;
+  estimated: boolean;
+  /** The issuing backend sent expires_at, i.e. it has the session-revocation API (logout-all). */
+  logoutAllSupported?: boolean;
+};
 
 /** @returns the stored token expiry, or null when unknown (e.g. a token issued before expiry tracking). */
 export async function getTokenMeta(): Promise<TokenMeta | null> {
@@ -342,7 +348,12 @@ export async function getTokenMeta(): Promise<TokenMeta | null> {
     if (!raw) return null;
     const meta = JSON.parse(raw);
     if (typeof meta?.expiresAt !== 'number' || typeof meta?.obtainedAt !== 'number') return null;
-    return { expiresAt: meta.expiresAt, obtainedAt: meta.obtainedAt, estimated: !!meta.estimated };
+    return {
+      expiresAt: meta.expiresAt,
+      obtainedAt: meta.obtainedAt,
+      estimated: !!meta.estimated,
+      logoutAllSupported: !!meta.logoutAllSupported,
+    };
   } catch {
     return null; // unreadable == unknown: the caller refreshes, which rewrites it
   }

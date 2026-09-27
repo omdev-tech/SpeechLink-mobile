@@ -13,6 +13,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   /** End every session of this account (all devices). Throws (and keeps this session) on failure. */
   signOutEverywhere: () => Promise<void>;
+  /** The backend that issued this session supports logging out everywhere (hide the UI otherwise). */
+  canSignOutEverywhere: boolean;
   loginWithGoogle: () => Promise<boolean>;
   token: string | null;
   isLoading: boolean;
@@ -24,6 +26,7 @@ export const AuthContext = createContext<AuthContextType>({
   signIn: async () => {},
   signOut: async () => {},
   signOutEverywhere: async () => {},
+  canSignOutEverywhere: false,
   loginWithGoogle: async () => false,
   token: null,
   isLoading: true,
@@ -36,14 +39,24 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [userToken, setUserToken] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticatingWithGoogle, setIsAuthenticatingWithGoogle] = useState(false);
+  const [canSignOutEverywhere, setCanSignOutEverywhere] = useState(false);
+  const userTokenRef = useRef<string | null>(null);
+  userTokenRef.current = userToken;
+  const signingOutRef = useRef(false);
 
-  // Set up auth failure listener
+  // Set up auth failure listener. Idempotent: several in-flight requests may all report the dead
+  // session; sign out once, and not at all when already signed out.
   useEffect(() => {
-    // Register callback for auth failures
-    authService.onAuthenticationFailed(() => {
+    authService.onAuthenticationFailed(async () => {
+      if (!userTokenRef.current || signingOutRef.current) return;
+      signingOutRef.current = true;
       console.log('Authentication failed, redirecting to login');
       setAuthError('Your session has expired. Please sign in again.');
-      signOut();
+      try {
+        await signOut();
+      } finally {
+        signingOutRef.current = false;
+      }
     });
   }, []);
 
@@ -153,6 +166,25 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     };
   }, [isSignedIn]);
 
+  // Log-out-everywhere capability follows the current session (new backend vs current prod).
+  useEffect(() => {
+    if (!userToken) {
+      setCanSignOutEverywhere(false);
+      return;
+    }
+    let active = true;
+    Promise.resolve(authService.canLogoutEverywhere?.())
+      .then((supported) => {
+        if (active) setCanSignOutEverywhere(!!supported);
+      })
+      .catch(() => {
+        if (active) setCanSignOutEverywhere(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userToken]);
+
   const signIn = async (token: string, expiry?: TokenExpiryInfo) => {
     try {
       if (!token) {
@@ -188,6 +220,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const signOut = async () => {
     try {
       await authService.clearToken();
+      userTokenRef.current = null;
       setUserToken(null);
     } catch (e) {
       console.error('Failed to remove auth token', e);
@@ -233,6 +266,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     signIn,
     signOut,
     signOutEverywhere,
+    canSignOutEverywhere,
     loginWithGoogle,
     token: userToken,
     isLoading,

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const LOCALES_DIR = path.join(__dirname, '..', 'locales');
-const KEYS = ['logoutEverywhere', 'logoutEverywhereConfirm', 'logoutEverywhereError'];
+const KEYS = ['logoutEverywhere', 'logoutEverywhereConfirm', 'logoutEverywhereError', 'logoutEverywhereUnavailable'];
 
 describe('"log out everywhere" translations', () => {
   const files = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));

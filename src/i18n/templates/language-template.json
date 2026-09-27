@@ -398,6 +398,7 @@
     "logoutEverywhere": "",
     "logoutEverywhereConfirm": "",
     "logoutEverywhereError": "",
+    "logoutEverywhereUnavailable": "",
     "darkMode": "",
     "audioSettings": "",
     "voiceSettings": "",

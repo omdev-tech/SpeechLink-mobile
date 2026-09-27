@@ -6,6 +6,7 @@ jest.mock('../../services/authService', () => ({
     clearToken: jest.fn(),
     refreshIfNeeded: jest.fn(),
     logoutEverywhere: jest.fn(),
+    canLogoutEverywhere: jest.fn(),
   },
 }));
 jest.mock('../../services/apiService', () => ({ apiService: {} }));
@@ -41,6 +42,8 @@ describe('AuthProvider proactive refresh + log out everywhere', () => {
     jest.useFakeTimers();
     Object.values(svc).forEach((m) => m.mockReset());
     svc.refreshIfNeeded.mockResolvedValue('not_needed');
+    svc.canLogoutEverywhere.mockResolvedValue(false);
+    svc.clearToken.mockResolvedValue(undefined);
     appStateHandlers = [];
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_type: any, handler: any) => {
       appStateHandlers.push(handler);
@@ -104,6 +107,45 @@ describe('AuthProvider proactive refresh + log out everywhere', () => {
     await act(async () => { await ctx.signOutEverywhere(); });
     expect(svc.logoutEverywhere).toHaveBeenCalledTimes(1);
     expect(shownToken()).toBe('none');
+  });
+
+  it('exposes canSignOutEverywhere from the stored session capability', async () => {
+    svc.getToken.mockResolvedValue({ access_token: 'tok' });
+    svc.canLogoutEverywhere.mockResolvedValue(true);
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await flush();
+    expect(ctx.canSignOutEverywhere).toBe(true);
+  });
+
+  it('canSignOutEverywhere is false on a backend without logout-all', async () => {
+    svc.getToken.mockResolvedValue({ access_token: 'tok' });
+    svc.canLogoutEverywhere.mockResolvedValue(false);
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await flush();
+    expect(ctx.canSignOutEverywhere).toBe(false);
+  });
+
+  it('auth-failed signals are idempotent: N signals -> one sign-out', async () => {
+    svc.getToken.mockResolvedValue({ access_token: 'tok' });
+    let release!: () => void;
+    svc.clearToken.mockImplementation(() => new Promise<void>((r) => (release = r)));
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await flush();
+    const onFailed = svc.onAuthenticationFailed.mock.calls[0][0];
+
+    await act(async () => {
+      onFailed();
+      onFailed();
+      onFailed();
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    release();
+    await flush();
+    expect(svc.clearToken).toHaveBeenCalledTimes(1);
+    expect(shownToken()).toBe('none');
+
+    await act(async () => { onFailed(); await jest.advanceTimersByTimeAsync(0); }); // already signed out
+    expect(svc.clearToken).toHaveBeenCalledTimes(1);
   });
 
   it('signOutEverywhere failure keeps this session and surfaces the error', async () => {

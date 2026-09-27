@@ -403,6 +403,7 @@
     "logoutEverywhere": "모든 기기에서 로그아웃",
     "logoutEverywhereConfirm": "이 기기를 포함한 모든 곳에서 로그아웃됩니다. 각 기기에서 다시 로그인해야 합니다.",
     "logoutEverywhereError": "모든 기기에서 로그아웃하지 못했습니다. 연결을 확인하고 다시 시도하세요.",
+    "logoutEverywhereUnavailable": "모든 기기에서 로그아웃은 아직 사용할 수 없습니다. 다음 업데이트 후 다시 시도하세요.",
     "reportBug": "버그 신고",
     "requestFeature": "기능 요청",
     "darkMode": "다크 모드",

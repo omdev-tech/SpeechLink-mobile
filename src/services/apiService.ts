@@ -85,6 +85,7 @@ class ApiService {
       console.log(`[API Response] ${url} - Status: ${response.status}`);
       
       if (response.status === 401 && !isRetry) {
+        const generation = authService.getSessionGeneration();
         // Already rotated by a concurrent/proactive refresh? Just retry with the current token.
         const current = await this.getAuthHeaders();
         if (current.Authorization !== headers.Authorization) {
@@ -92,15 +93,22 @@ class ApiService {
         }
 
         console.log('[Auth] 401 detected, attempting token refresh');
-        const outcome = await authService.refreshSession(); // SecureStorageUnavailableError propagates
+        // The API rejected the token: any refresh failure other than 429/503/network is final.
+        const outcome = await authService.refreshSession('api401'); // SecureStorageUnavailableError propagates
         if (outcome === 'refreshed') {
           return this.fetchWithAuth(endpoint, options, true);
         }
         if (outcome === 'transient') {
+          // A new token may exist only in memory (storage write failed): use it.
+          const latest = await authService.getToken();
+          if (latest && `Bearer ${latest.access_token}` !== headers.Authorization) {
+            return this.fetchWithAuth(endpoint, options, true);
+          }
           throw new Error('Session could not be verified right now - please try again');
         }
-        // 'invalid' already cleared the session and notified listeners.
-        if (outcome === 'no_token') authService.triggerAuthFailedCallbacks();
+        // 'invalid' already ended the session (once). 'no_token': the token we sent has been
+        // cleared meanwhile; end that session only if nobody else already did.
+        if (outcome === 'no_token') await authService.endSession(generation);
         throw new Error('Authentication failed - please log in again');
       }
       

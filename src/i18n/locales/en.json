@@ -474,6 +474,7 @@
     "logoutEverywhere": "Log out of all devices",
     "logoutEverywhereConfirm": "This signs you out everywhere, including this device. You will need to sign in again on each device.",
     "logoutEverywhereError": "Could not sign out of all devices. Check your connection and try again.",
+    "logoutEverywhereUnavailable": "Logging out of all devices is not available yet. Please try again after the next update.",
     "reportBug": "Report a Bug",
     "requestFeature": "Request a Feature",
     "darkMode": "Dark Mode",

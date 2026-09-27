@@ -189,6 +189,7 @@
     "logoutEverywhere": "Log ud af alle enheder",
     "logoutEverywhereConfirm": "Du bliver logget ud overalt, også på denne enhed. Du skal logge ind igen på hver enhed.",
     "logoutEverywhereError": "Kunne ikke logge ud af alle enheder. Tjek din forbindelse, og prøv igen.",
+    "logoutEverywhereUnavailable": "Log ud af alle enheder er ikke tilgængeligt endnu. Prøv igen efter næste opdatering.",
     "reportBug": "Rapporter en fejl",
     "requestFeature": "Anmod om en funktion",
     "darkMode": "Mørk tilstand",

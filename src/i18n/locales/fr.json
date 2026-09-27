@@ -471,6 +471,7 @@
     "logoutEverywhere": "Se déconnecter de tous les appareils",
     "logoutEverywhereConfirm": "Vous serez déconnecté partout, y compris sur cet appareil. Vous devrez vous reconnecter sur chaque appareil.",
     "logoutEverywhereError": "Impossible de se déconnecter de tous les appareils. Vérifiez votre connexion et réessayez.",
+    "logoutEverywhereUnavailable": "La déconnexion de tous les appareils n'est pas encore disponible. Réessayez après la prochaine mise à jour.",
     "reportBug": "Signaler un bug",
     "requestFeature": "Demander une fonctionnalité",
     "darkMode": "Mode Sombre",

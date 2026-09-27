@@ -401,6 +401,7 @@
     "logoutEverywhere": "Cerrar sesión en todos los dispositivos",
     "logoutEverywhereConfirm": "Se cerrará tu sesión en todas partes, incluido este dispositivo. Tendrás que volver a iniciar sesión en cada dispositivo.",
     "logoutEverywhereError": "No se pudo cerrar la sesión en todos los dispositivos. Comprueba tu conexión e inténtalo de nuevo.",
+    "logoutEverywhereUnavailable": "Cerrar sesión en todos los dispositivos aún no está disponible. Inténtalo de nuevo después de la próxima actualización.",
     "reportBug": "Reportar un Error",
     "requestFeature": "Solicitar una Función",
     "darkMode": "Modo Oscuro",

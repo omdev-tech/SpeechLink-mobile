@@ -6,16 +6,18 @@ import { Alert } from 'react-native';
 import { render, fireEvent, act, screen } from '@testing-library/react-native';
 import { AuthContext } from '../../../contexts/AuthContext';
 import LogoutEverywhereButton from '../LogoutEverywhereButton';
+import { LogoutEverywhereUnavailableError } from '../../../services/authService';
 
 type AlertButton = { text?: string; style?: string; onPress?: () => unknown };
 
 describe('LogoutEverywhereButton', () => {
   let alertSpy: jest.SpyInstance;
   let signOutEverywhere: jest.Mock;
+  let supported: boolean;
 
   const renderButton = () =>
     render(
-      <AuthContext.Provider value={{ signOutEverywhere } as any}>
+      <AuthContext.Provider value={{ signOutEverywhere, canSignOutEverywhere: supported } as any}>
         <LogoutEverywhereButton />
       </AuthContext.Provider>
     );
@@ -24,9 +26,25 @@ describe('LogoutEverywhereButton', () => {
   beforeEach(() => {
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     signOutEverywhere = jest.fn().mockResolvedValue(undefined);
+    supported = true;
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
   afterEach(() => jest.restoreAllMocks());
+
+  it('is hidden when the backend does not support logging out everywhere', () => {
+    supported = false;
+    renderButton();
+    expect(screen.queryByText('settings.logoutEverywhere')).toBeNull();
+  });
+
+  it('shows "not available yet" when the server has no logout-all endpoint (404)', async () => {
+    signOutEverywhere.mockRejectedValue(new LogoutEverywhereUnavailableError());
+    renderButton();
+    fireEvent.press(screen.getByText('settings.logoutEverywhere'));
+    const confirm = lastButtons().find((b) => b.style === 'destructive');
+    await act(async () => { await confirm?.onPress?.(); });
+    expect(alertSpy).toHaveBeenLastCalledWith('general.error.title', 'settings.logoutEverywhereUnavailable');
+  });
 
   it('asks for confirmation first and does nothing on cancel', () => {
     renderButton();

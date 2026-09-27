@@ -459,6 +459,7 @@
     "logoutEverywhere": "Sair de todos os dispositivos",
     "logoutEverywhereConfirm": "Você será desconectado em todos os lugares, incluindo este dispositivo. Será necessário entrar novamente em cada dispositivo.",
     "logoutEverywhereError": "Não foi possível sair de todos os dispositivos. Verifique sua conexão e tente novamente.",
+    "logoutEverywhereUnavailable": "Sair de todos os dispositivos ainda não está disponível. Tente novamente após a próxima atualização.",
     "reportBug": "Reportar um Bug",
     "requestFeature": "Solicitar um Recurso",
     "darkMode": "Modo Escuro",

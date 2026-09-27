@@ -403,6 +403,7 @@
     "logoutEverywhere": "Odhlásit ze všech zařízení",
     "logoutEverywhereConfirm": "Budete odhlášeni všude, včetně tohoto zařízení. Na každém zařízení se budete muset znovu přihlásit.",
     "logoutEverywhereError": "Odhlášení ze všech zařízení se nezdařilo. Zkontrolujte připojení a zkuste to znovu.",
+    "logoutEverywhereUnavailable": "Odhlášení ze všech zařízení zatím není k dispozici. Zkuste to znovu po příští aktualizaci.",
     "reportBug": "Nahlásit chybu",
     "requestFeature": "Požádat o funkci",
     "darkMode": "Tmavý režim",

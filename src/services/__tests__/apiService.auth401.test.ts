@@ -86,13 +86,60 @@ describe('apiService: 401 on an authenticated route', () => {
     expect(apiCalls()).toHaveLength(2);
   });
 
-  it.each([500, 503, 429])('keeps the session when the refresh fails transiently (%i)', async (status) => {
-    route(() => 401, () => respond(status, {}, status === 500 ? {} : { 'retry-after': '30' }));
+  it.each([503, 429])('keeps the session when the refresh fails transiently (%i)', async (status) => {
+    route(() => 401, () => respond(status, {}, { 'retry-after': '30' }));
 
     await expect(apiService.get('/api/profile')).rejects.toThrow();
     expect(failed).not.toHaveBeenCalled();
     expect(await secureStorage.getToken()).toBe('old-tok');
     expect(apiCalls()).toHaveLength(1);
+  });
+
+  it.each([500, 404, 400])('logs out when the API said 401 and the refresh fails with %i (dead token on current prod)', async (status) => {
+    route(() => 401, () => respond(status, { error: 'x' }));
+
+    await expect(apiService.get('/api/profile')).rejects.toThrow(/log in again/i);
+    expect(failed).toHaveBeenCalledTimes(1);
+    expect(await secureStorage.getToken()).toBeNull();
+    expect(apiCalls()).toHaveLength(1);
+  });
+
+  it('expired token on current prod (refresh 500 "decode failed") -> signed out, not stuck', async () => {
+    await secureStorage.setToken('expired-tok', { expiresAt: NOW_S - DAY, obtainedAt: NOW_S - 26 * DAY, estimated: true });
+    authService.__resetSessionStateForTests();
+    authService.onAuthenticationFailed(failed);
+    route(() => 401, () => respond(500, { error: 'Internal Server Error' }));
+
+    await expect(apiService.get('/api/profile')).rejects.toThrow(/log in again/i);
+    await expect(apiService.get('/api/other')).rejects.toThrow(); // no token any more: no refresh loop
+    expect(refreshCalls()).toHaveLength(1);
+    expect(failed).toHaveBeenCalledTimes(1);
+  });
+
+  it('N in-flight 401s with a dead session -> ONE refresh and ONE sign-out', async () => {
+    let resolveRefresh!: (r: any) => void;
+    const refreshResponse = new Promise((r) => (resolveRefresh = r));
+    route(() => 401, () => refreshResponse);
+
+    const all = Promise.allSettled([1, 2, 3, 4, 5].map((i) => apiService.get(`/api/r${i}`)));
+    await new Promise((r) => setTimeout(r, 10));
+    resolveRefresh(respond(401, { error: 'Invalid or expired token' }));
+
+    const results = await all;
+    expect(results.every((r) => r.status === 'rejected')).toBe(true);
+    expect(refreshCalls()).toHaveLength(1);
+    expect(failed).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries with the in-memory token when the refreshed token could not be persisted', async () => {
+    route(
+      (bearer) => (bearer === 'Bearer new-tok' ? 200 : 401),
+      () => respond(200, { access_token: 'new-tok', expires_at: NOW_S + 90 * DAY })
+    );
+    (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(new Error('Keystore operation failed'));
+
+    await expect(apiService.get('/api/profile')).resolves.toEqual({ ok: true });
+    expect(failed).not.toHaveBeenCalled();
   });
 
   it('concurrent 401s share ONE refresh, and every request is retried once', async () => {

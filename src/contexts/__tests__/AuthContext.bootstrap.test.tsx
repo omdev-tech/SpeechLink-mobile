@@ -5,6 +5,7 @@ jest.mock('../../services/authService', () => ({
     saveToken: jest.fn(),
     clearToken: jest.fn(),
     refreshIfNeeded: jest.fn(async () => 'not_needed'),
+    canLogoutEverywhere: jest.fn(async () => false),
   },
 }));
 jest.mock('../../services/apiService', () => ({ apiService: {} }));

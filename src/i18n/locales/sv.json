@@ -459,6 +459,7 @@
     "logoutEverywhere": "Logga ut från alla enheter",
     "logoutEverywhereConfirm": "Du loggas ut överallt, även på den här enheten. Du måste logga in igen på varje enhet.",
     "logoutEverywhereError": "Det gick inte att logga ut från alla enheter. Kontrollera anslutningen och försök igen.",
+    "logoutEverywhereUnavailable": "Utloggning från alla enheter är inte tillgänglig än. Försök igen efter nästa uppdatering.",
     "reportBug": "Rapportera en Bugg",
     "requestFeature": "Begär en Funktion",
     "darkMode": "Mörkt läge",

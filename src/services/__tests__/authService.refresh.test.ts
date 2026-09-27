@@ -10,7 +10,7 @@ jest.mock('../../api/auth', () => ({
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as secureStorage from '../secureStorage';
-import { authService } from '../authService';
+import { authService, LogoutEverywhereUnavailableError } from '../authService';
 import { login } from '../../api/auth';
 
 const secure = (SecureStore as any).__store as Map<string, string>;
@@ -78,7 +78,7 @@ describe('proactive refresh decision (launch / foreground)', () => {
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ token: 'old-tok' });
     expect(await secureStorage.getToken()).toBe('new-tok');
-    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 90 * DAY, obtainedAt: NOW_S, estimated: false });
+    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 90 * DAY, obtainedAt: NOW_S, estimated: false, logoutAllSupported: true });
     expect((await authService.getToken())?.access_token).toBe('new-tok');
   });
 
@@ -100,7 +100,7 @@ describe('proactive refresh decision (launch / foreground)', () => {
     await expect(authService.refreshIfNeeded()).resolves.toBe('refreshed');
     expect(await secureStorage.getToken()).toBe('fresh-tok');
     // Unknown expiry: conservative local estimate of now + 25 days.
-    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 25 * DAY, obtainedAt: NOW_S, estimated: true });
+    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 25 * DAY, obtainedAt: NOW_S, estimated: true, logoutAllSupported: false });
 
     // Next launch a few hours later: no refresh storm.
     authService.__resetSessionStateForTests();
@@ -129,7 +129,7 @@ describe('proactive refresh decision (launch / foreground)', () => {
 });
 
 describe('refreshSession outcomes', () => {
-  const soonMeta = () => ({ expiresAt: NOW_S + 5 * DAY, obtainedAt: NOW_S - 85 * DAY, estimated: false });
+  const soonMeta = () => ({ expiresAt: NOW_S + 5 * DAY, obtainedAt: NOW_S - 85 * DAY, estimated: false, logoutAllSupported: false });
 
   it('401 from refresh = session dead: clears token + expiry and signals logout', async () => {
     await seedSession('dead-tok', soonMeta());
@@ -204,6 +204,108 @@ describe('refreshSession outcomes', () => {
   });
 });
 
+describe('proactive refresh of an already-expired token (e.g. current prod: 500 on expired)', () => {
+  const expiredMeta = (estimated: boolean) => ({ expiresAt: NOW_S - 60, obtainedAt: NOW_S - 26 * DAY, estimated });
+
+  it.each([
+    [500, true],
+    [500, false],
+    [404, true],
+    [400, false],
+  ])('%i with an expired token (estimated=%s) ends the session once', async (status, estimated) => {
+    await seedSession('expired-tok', expiredMeta(estimated));
+    fetchMock.mockResolvedValue(respond({ status, body: { error: 'x' } }));
+
+    await expect(authService.refreshIfNeeded()).resolves.toBe('invalid');
+    expect(await secureStorage.getToken()).toBeNull();
+    expect(await secureStorage.getTokenMeta()).toBeNull();
+    expect(failed).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([429, 503])('%i with an expired token is still transient (token kept)', async (status) => {
+    await seedSession('expired-tok', expiredMeta(true));
+    fetchMock.mockResolvedValue(respond({ status, headers: { 'retry-after': '30' } }));
+    await expect(authService.refreshIfNeeded()).resolves.toBe('transient');
+    expect(await secureStorage.getToken()).toBe('expired-tok');
+    expect(failed).not.toHaveBeenCalled();
+  });
+
+  it('a network error with an expired token keeps it (offline is not a sign-out)', async () => {
+    await seedSession('expired-tok', expiredMeta(true));
+    fetchMock.mockRejectedValue(new TypeError('Network request failed'));
+    await expect(authService.refreshIfNeeded()).resolves.toBe('transient');
+    expect(await secureStorage.getToken()).toBe('expired-tok');
+  });
+});
+
+describe('refreshSession after the API rejected the token (reason "api401")', () => {
+  const meta = { expiresAt: NOW_S + 20 * DAY, obtainedAt: NOW_S - 5 * DAY, estimated: true };
+
+  it.each([400, 404, 500, 502])('%i from refresh is final: session ended once', async (status) => {
+    await seedSession('tok', meta);
+    fetchMock.mockResolvedValue(respond({ status }));
+    await expect(authService.refreshSession('api401')).resolves.toBe('invalid');
+    expect(await secureStorage.getToken()).toBeNull();
+    expect(failed).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([429, 503])('%i from refresh is transient', async (status) => {
+    await seedSession('tok', meta);
+    fetchMock.mockResolvedValue(respond({ status, headers: { 'retry-after': '60' } }));
+    await expect(authService.refreshSession('api401')).resolves.toBe('transient');
+    expect(await secureStorage.getToken()).toBe('tok');
+    expect(failed).not.toHaveBeenCalled();
+  });
+
+  it('a proactive 500 that is backing off does not hide a dead session from the 401 path', async () => {
+    await seedSession('tok', meta);
+    fetchMock.mockResolvedValue(respond({ status: 500 }));
+    await expect(authService.refreshSession()).resolves.toBe('transient');
+    await expect(authService.refreshSession('api401')).resolves.toBe('invalid');
+    expect(failed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('refreshed token that could not be persisted', () => {
+  it('is kept in memory, not reported as refreshed, and written on the next call', async () => {
+    await seedSession('old-tok', { expiresAt: NOW_S + 5 * DAY, obtainedAt: NOW_S - 85 * DAY, estimated: false });
+    fetchMock.mockResolvedValueOnce(respond({ status: 200, body: { access_token: 'new-tok', expires_at: NOW_S + 90 * DAY } }));
+    (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(new Error('Keystore operation failed'));
+
+    await expect(authService.refreshSession()).resolves.toBe('transient');
+    expect((await authService.getToken())?.access_token).toBe('new-tok'); // in-memory
+    expect(await secureStorage.getToken()).toBe('old-tok'); // not persisted yet
+
+    // Next foreground / call: the pending write is retried, no new refresh request.
+    await expect(authService.refreshIfNeeded()).resolves.toBe('not_needed');
+    expect(await secureStorage.getToken()).toBe('new-tok');
+    expect((await secureStorage.getTokenMeta())?.expiresAt).toBe(NOW_S + 90 * DAY);
+    expect(refreshCalls()).toHaveLength(1);
+  });
+});
+
+describe('log-out-everywhere capability', () => {
+  it('is supported when the server sent expires_at (new backend)', async () => {
+    await authService.saveToken({ access_token: 't', expires_at: NOW_S + 90 * DAY });
+    await expect(authService.canLogoutEverywhere()).resolves.toBe(true);
+  });
+
+  it('is not supported with the current backend (no expires_at), nor after a current-backend refresh', async () => {
+    await authService.saveToken({ access_token: 't' });
+    await expect(authService.canLogoutEverywhere()).resolves.toBe(false);
+
+    await authService.saveToken({ access_token: 't', expires_at: NOW_S + 10 * DAY });
+    authService.__resetSessionStateForTests();
+    fetchMock.mockResolvedValueOnce(respond({ status: 200, body: { access_token: 't2' } }));
+    await authService.refreshSession();
+    await expect(authService.canLogoutEverywhere()).resolves.toBe(false);
+  });
+
+  it('is not supported when signed out', async () => {
+    await expect(authService.canLogoutEverywhere()).resolves.toBe(false);
+  });
+});
+
 describe('expiry bookkeeping on login / logout', () => {
   it('login stores expires_at from the response', async () => {
     (login as jest.Mock).mockResolvedValueOnce({
@@ -216,17 +318,17 @@ describe('expiry bookkeeping on login / logout', () => {
     });
     await authService.loginWithCredentials({ email: 'a@b.c', password: 'pw' });
     expect(await secureStorage.getToken()).toBe('login-tok');
-    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 90 * DAY, obtainedAt: NOW_S, estimated: false });
+    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 90 * DAY, obtainedAt: NOW_S, estimated: false, logoutAllSupported: true });
   });
 
   it('a token saved with only expires_in gets expires_at = now + expires_in', async () => {
     await authService.saveToken({ access_token: 't', expires_in: 7776000 });
-    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 7776000, obtainedAt: NOW_S, estimated: false });
+    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 7776000, obtainedAt: NOW_S, estimated: false, logoutAllSupported: false });
   });
 
   it('a token saved without any expiry (current backend) gets a conservative 25-day estimate', async () => {
     await authService.saveToken({ access_token: 't' });
-    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 25 * DAY, obtainedAt: NOW_S, estimated: true });
+    expect(await secureStorage.getTokenMeta()).toEqual({ expiresAt: NOW_S + 25 * DAY, obtainedAt: NOW_S, estimated: true, logoutAllSupported: false });
   });
 
   it('clearToken removes the expiry too', async () => {
@@ -256,6 +358,13 @@ describe('logoutEverywhere', () => {
     fetchMock.mockResolvedValueOnce(respond({ status: 401 }));
     await authService.logoutEverywhere();
     expect(await secureStorage.getToken()).toBeNull();
+  });
+
+  it('404 (backend without logout-all) rejects with LogoutEverywhereUnavailableError', async () => {
+    await seedSession('tok', null);
+    fetchMock.mockResolvedValueOnce(respond({ status: 404 }));
+    await expect(authService.logoutEverywhere()).rejects.toBeInstanceOf(LogoutEverywhereUnavailableError);
+    expect(await secureStorage.getToken()).toBe('tok');
   });
 
   it.each([404, 500, 503])('fails loudly on %i and keeps the session (other devices were NOT signed out)', async (status) => {
