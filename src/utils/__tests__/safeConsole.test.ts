@@ -88,4 +88,11 @@ describe('safeConsole', () => {
     expect(out).not.toContain('SECRETLONG');
     expect(out).toMatch(/truncated/);
   });
+
+  it('caps the number of nodes visited per log call', () => {
+    const wide = { items: Array.from({ length: 5000 }, (_, i) => ({ i })) };
+    const out = JSON.stringify(redactForLog(wide));
+    expect(out).toContain('[…]');
+    expect((out.match(/"i":/g) || []).length).toBeLessThan(2100);
+  });
 });

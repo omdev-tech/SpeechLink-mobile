@@ -9,6 +9,9 @@ const REDACTED = '[REDACTED]';
 const METHODS = ['log', 'info', 'debug', 'warn', 'error'] as const;
 const MAX_DEPTH = 6;
 const MAX_STRING = 10_000;
+/** Upper bound on values visited per log call (huge arrays / wide objects). */
+const MAX_NODES = 2000;
+const ELIDED = '[…]';
 
 // Keys whose string values are secrets (case-insensitive substring match).
 const SECRET_KEY = /authorization|cookie|password|secret|token|verifier|tempkey|temp_key|handoff|api[-_]?key/i;
@@ -45,7 +48,13 @@ function summariseAxiosError(err: any): string {
   return redactString(`AxiosError: ${err.message} [${request || 'request'} -> ${status}]`);
 }
 
-export function redactForLog(value: unknown, depth = 0, seen: WeakSet<object> = new WeakSet()): unknown {
+export function redactForLog(
+  value: unknown,
+  depth = 0,
+  seen: WeakSet<object> = new WeakSet(),
+  budget: { nodes: number } = { nodes: 0 }
+): unknown {
+  if (++budget.nodes > MAX_NODES) return ELIDED;
   if (typeof value === 'string') return redactString(value);
   if (value === null || typeof value !== 'object') return value;
   if (isAxiosLikeError(value)) return summariseAxiosError(value);
@@ -64,11 +73,25 @@ export function redactForLog(value: unknown, depth = 0, seen: WeakSet<object> = 
   if (depth >= MAX_DEPTH) return '[Object]';
   seen.add(value as object);
   try {
-    if (Array.isArray(value)) return value.map((v) => redactForLog(v, depth + 1, seen));
+    if (Array.isArray(value)) {
+      const out: unknown[] = [];
+      for (const v of value) {
+        if (budget.nodes >= MAX_NODES) {
+          out.push(ELIDED);
+          break;
+        }
+        out.push(redactForLog(v, depth + 1, seen, budget));
+      }
+      return out;
+    }
 
     const out: Record<string, unknown> = {};
     for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-      out[key] = typeof v === 'string' && SECRET_KEY.test(key) ? REDACTED : redactForLog(v, depth + 1, seen);
+      if (budget.nodes >= MAX_NODES) {
+        out[ELIDED] = ELIDED;
+        break;
+      }
+      out[key] = typeof v === 'string' && SECRET_KEY.test(key) ? REDACTED : redactForLog(v, depth + 1, seen, budget);
     }
     return out;
   } finally {
@@ -88,7 +111,8 @@ export function installSafeConsole(target: Console = console): void {
     t[method] = (...args: unknown[]) => {
       let safeArgs: unknown[];
       try {
-        safeArgs = args.map((a) => redactForLog(a));
+        const budget = { nodes: 0 }; // shared by all arguments of one call
+        safeArgs = args.map((a) => redactForLog(a, 0, new WeakSet(), budget));
       } catch {
         safeArgs = ['[log redaction failed]'];
       }
