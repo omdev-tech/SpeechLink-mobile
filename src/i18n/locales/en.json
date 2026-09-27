@@ -141,7 +141,7 @@
     "inviteUrlError": "Failed to open invite URL",
     "refreshConnection": "Refresh connection",
     "refreshConfirmTitle": "Refresh Discord connection",
-    "refreshConfirmMessage": "You will be disconnected and then reconnected to Discord. Continue?",
+    "refreshConfirmMessage": "You will be asked to sign in to Discord again to renew SpeechLink's access. Your server and channel selection is kept. Continue?",
     "refreshConfirmAction": "Refresh",
     "refreshFailed": "Failed to refresh Discord connection. Please try again."
   },

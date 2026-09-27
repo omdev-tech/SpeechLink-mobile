@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test": "jest",
     "build:dev": "eas build --profile development",
     "build:dev:android": "eas build --profile development --platform android",
     "build:dev:ios": "eas build --profile development --platform ios",
@@ -79,8 +80,13 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.1.10",
+    "jest": "~29.7.0",
+    "jest-expo": "~54.0.18",
     "patch-package": "^8.0.1",
+    "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   },
   "private": true,
@@ -102,5 +108,17 @@
         "enabled": false
       }
     }
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "setupFiles": [
+      "./jest.setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/android/",
+      "/ios/"
+    ],
+    "testTimeout": 20000
   }
 }

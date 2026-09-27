@@ -161,80 +161,61 @@ const DiscordSettingsScreen: React.FC = () => {
     };
   }, [handleDeepLink]);
 
-  // Connect Discord Account
-  const handleConnectToDiscord = useCallback(async () => {
+  // Start Discord OAuth. Deliberately independent of `isAuthenticated`: it is also used to
+  // re-authenticate an already linked account ("Refresh connection"), whose tokens the
+  // server may have lost. The backend's OAuth callback overwrites the stored tokens (and
+  // keeps the selected server/channel), so no unlink is needed first.
+  const startDiscordOAuth = useCallback(async ({ reauth }: { reauth: boolean }) => {
+    setAuthInProgress(true);
     try {
-      if (isAuthenticated) {
-        // If already authenticated, just load settings
-        await stableLoadSettings();
-        return;
+      // Get auth URL from backend
+      const authUrl = await getDiscordAuthUrl();
+      if (!authUrl) {
+        throw new Error('Failed to get Discord authorization URL');
       }
-      
-      // Start OAuth flow
-      setAuthInProgress(true);
-      try {
-        // Get auth URL from backend
-        const authUrl = await getDiscordAuthUrl();
-        if (!authUrl) {
-          throw new Error('Failed to get Discord authorization URL');
-        }
-        
-        console.log('Opening Discord auth URL:', authUrl);
-        await WebBrowser.openBrowserAsync(authUrl);
-        
-        // When control returns here, the user has closed the browser
-        console.log('Browser closed, checking for successful authentication');
-        setAuthInProgress(true);
-        
-        let attempts = 0;
-        const maxAttempts = 10; // Try for about 10 seconds
-        
-        while (attempts < maxAttempts) {
-          try {
-            const success = await handleDiscordCallback("");
-            
-            if (success) {
-              Alert.alert(
-                t('discord.authSuccess'),
-                t('discord.authSuccessMessage')
-              );
-              await stableLoadSettings();
-              setAuthInProgress(false);
-              return;
-            }
-          } catch (err) {
-            console.error('Error checking auth status:', err);
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          attempts++;
-        }
-        
-        // If we get here, authentication likely failed
-        setAuthInProgress(false);
+
+      console.log('Opening Discord auth URL:', authUrl);
+      await WebBrowser.openBrowserAsync(authUrl);
+
+      // When control returns here, the user has closed the browser
+      console.log('Browser closed, checking for successful authentication');
+      // On re-auth the old link still exists, so only a freshly claimed code counts.
+      const success = await handleDiscordCallback('', { requireFreshAuth: reauth, maxAttempts: 10 });
+      if (success) {
+        Alert.alert(
+          t('discord.authSuccess'),
+          t('discord.authSuccessMessage')
+        );
+      } else {
         Alert.alert(
           t('discord.authFailed'),
-          t('discord.authFailedMessage')
+          reauth ? t('discord.refreshFailed') : t('discord.authFailedMessage')
         );
-      } catch (err) {
-        console.error('Error during Discord authentication:', err);
-        Alert.alert(
-          t('general.error.title'),
-          t('discord.authError', 'Failed to connect to Discord. Please try again.')
-        );
-        setAuthInProgress(false);
       }
+      return success;
     } catch (err) {
-      setAuthInProgress(false);
+      console.error('Error during Discord authentication:', err);
       Alert.alert(
         t('general.error.title'),
-        err instanceof Error ? err.message : 'Failed to connect to Discord'
+        t('discord.authError', 'Failed to connect to Discord. Please try again.')
       );
+      return false;
+    } finally {
+      setAuthInProgress(false);
     }
-  }, [isAuthenticated, getDiscordAuthUrl, handleDiscordCallback, stableLoadSettings]);
+  }, [getDiscordAuthUrl, handleDiscordCallback, t]);
 
-  // loadSettings between disconnect and reconnect so handleConnectToDiscord sees
-  // isAuthenticated === false and takes the OAuth path instead of the no-op branch.
+  // Connect Discord Account
+  const handleConnectToDiscord = useCallback(async () => {
+    if (isAuthenticated) {
+      // If already authenticated, just load settings
+      await stableLoadSettings();
+      return;
+    }
+    await startDiscordOAuth({ reauth: false });
+  }, [isAuthenticated, stableLoadSettings, startDiscordOAuth]);
+
+  // Re-run Discord OAuth for an already linked account (e.g. tokens lost server-side).
   const handleRefreshConnection = useCallback(() => {
     Alert.alert(
       t('discord.refreshConfirmTitle'),
@@ -245,30 +226,18 @@ const DiscordSettingsScreen: React.FC = () => {
           text: t('discord.refreshConfirmAction'),
           style: 'destructive',
           onPress: async () => {
-            try {
-              const disconnected = await stableDisconnect();
-              if (!disconnected) {
-                Alert.alert(
-                  t('general.error.title'),
-                  t('discord.refreshFailed')
-                );
-                return;
-              }
-
-              await stableLoadSettings();
-              await handleConnectToDiscord();
-            } catch (err) {
-              console.error('Error refreshing Discord connection:', err);
-              Alert.alert(
-                t('general.error.title'),
-                t('discord.refreshFailed')
+            const success = await startDiscordOAuth({ reauth: true });
+            if (!success) {
+              // Resync the screen with the server whatever happened in the browser.
+              await stableLoadSettings().catch((err) =>
+                console.error('Error reloading Discord settings after refresh:', err)
               );
             }
           },
         },
       ]
     );
-  }, [stableDisconnect, stableLoadSettings, handleConnectToDiscord, t]);
+  }, [startDiscordOAuth, stableLoadSettings, t]);
 
   // Invite Discord Bot
   const handleInviteBot = useCallback(async () => {
@@ -925,29 +894,29 @@ const DiscordSettingsScreen: React.FC = () => {
               {/* Stage 3: Join/Leave Voice Channel */}
               {renderJoinButton()}
 
-              {isConnected && (
-                <TouchableOpacity
-                  style={styles.refreshButton}
-                  onPress={handleRefreshConnection}
-                  disabled={isLoading || authInProgress}
-                >
-                  {isLoading || authInProgress ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons
-                        name="refresh-outline"
-                        size={20}
-                        color="#fff"
-                        style={styles.buttonIcon}
-                      />
-                      <Text style={styles.refreshButtonText}>
-                        {t('discord.refreshConnection')}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
+              {/* Re-run OAuth for the linked account, e.g. after the server lost its Discord tokens.
+                  Not gated on isConnected: with dead tokens the user cannot even join a channel. */}
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={handleRefreshConnection}
+                disabled={isLoading || authInProgress}
+              >
+                {isLoading || authInProgress ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="refresh-outline"
+                      size={20}
+                      color="#fff"
+                      style={styles.buttonIcon}
+                    />
+                    <Text style={styles.refreshButtonText}>
+                      {t('discord.refreshConnection')}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </>
           )}
         </View>

@@ -138,7 +138,7 @@
     "leaveVoice": "Quitter le Canal Vocal",
     "refreshConnection": "Rafraîchir la connexion",
     "refreshConfirmTitle": "Rafraîchir la connexion Discord",
-    "refreshConfirmMessage": "Vous allez être déconnecté puis reconnecté à Discord. Continuer ?",
+    "refreshConfirmMessage": "Vous allez devoir vous reconnecter à Discord pour renouveler l'accès de SpeechLink. Votre serveur et votre canal restent sélectionnés. Continuer ?",
     "refreshConfirmAction": "Rafraîchir",
     "refreshFailed": "Échec du rafraîchissement de la connexion Discord. Veuillez réessayer."
   },

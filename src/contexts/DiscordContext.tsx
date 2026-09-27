@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { discordService, DiscordServer, DiscordChannel, DiscordSettings, ConnectionStatus } from '../services/discordService';
+import { discordService, DiscordServer, DiscordChannel, DiscordSettings, ConnectionStatus, DiscordCallbackOptions } from '../services/discordService';
 
 interface DiscordContextType {
   isConnected: boolean;
@@ -14,7 +14,7 @@ interface DiscordContextType {
   currentChannel: DiscordChannel | null;
   error: string | null;
   getDiscordAuthUrl: () => Promise<string>;
-  handleDiscordCallback: (code: string) => Promise<boolean>;
+  handleDiscordCallback: (code: string, options?: DiscordCallbackOptions) => Promise<boolean>;
   loadServers: () => Promise<void>;
   loadChannels: (serverId: string) => Promise<void>;
   loadSettings: () => Promise<void>;
@@ -71,11 +71,11 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const handleDiscordCallback = async (code: string): Promise<boolean> => {
+  const handleDiscordCallback = async (code: string, options?: DiscordCallbackOptions): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
     try {
-      const success = await discordService.handleCallback(code);
+      const success = await discordService.handleCallback(code, options);
       if (success) {
         setIsAuthenticated(true);
         await loadSettings();
