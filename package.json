@@ -22,7 +22,8 @@
     "deploy:android": "eas build --profile production --platform android --auto-submit",
     "deploy:ios": "eas build --profile production --platform ios --auto-submit",
     "prebuild": "expo prebuild",
-    "prebuild:clean": "expo prebuild --clean"
+    "prebuild:clean": "expo prebuild --clean",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -79,6 +80,7 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@types/react": "~19.1.10",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   },
   "private": true,
