@@ -105,4 +105,93 @@ describe('secureStorage', () => {
       warn.mockRestore();
     });
   });
+
+  describe('undecryptable Android keystore entries (OS update / backup restore)', () => {
+    // Simulates the Keystore key being gone: reads of these keys throw until they are deleted.
+    const corrupt = new Set<string>();
+    const getMock = SecureStore.getItemAsync as jest.Mock;
+    const delMock = SecureStore.deleteItemAsync as jest.Mock;
+    let origGet: any;
+    let origDel: any;
+    let warn: jest.SpyInstance;
+
+    beforeEach(() => {
+      corrupt.clear();
+      origGet = getMock.getMockImplementation();
+      origDel = delMock.getMockImplementation();
+      getMock.mockImplementation(async (key: string) => {
+        if (corrupt.has(key)) throw new Error('Could not decrypt the value for key');
+        return origGet(key);
+      });
+      delMock.mockImplementation(async (key: string) => {
+        corrupt.delete(key);
+        return origDel(key);
+      });
+      warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      getMock.mockImplementation(origGet);
+      delMock.mockImplementation(origDel);
+      warn.mockRestore();
+    });
+
+    it('an unreadable entry does not throw: it is deleted and the legacy copy is used', async () => {
+      secure.set('auth_token', 'garbage');
+      corrupt.add('auth_token');
+      await AsyncStorage.setItem('auth_token', 'legacy-access');
+      await expect(getToken()).resolves.toBe('legacy-access');
+    });
+
+    it('an unreadable entry with no legacy copy reads as logged-out, and a new login persists', async () => {
+      secure.set('auth_token', 'garbage');
+      corrupt.add('auth_token');
+      await expect(getToken()).resolves.toBeNull();
+      await setToken('new-login');
+      await expect(getToken()).resolves.toBe('new-login');
+    });
+
+    it('an unreadable chunk-count key does not block writing a new token', async () => {
+      secure.set('auth_token.chunks', '3');
+      corrupt.add('auth_token.chunks');
+      await setToken('new-login');
+      await expect(getToken()).resolves.toBe('new-login');
+    });
+  });
+
+  it('logout during the first-launch migration does not resurrect the legacy token', async () => {
+    await AsyncStorage.setItem('auth_token', 'legacy-access');
+    const pendingRead = getToken(); // kicks off the migration
+    await clearTokens();
+    await pendingRead;
+    expect(await getToken()).toBeNull();
+    expect(await AsyncStorage.getItem('auth_token')).toBeNull();
+  });
+
+  describe('token rotation is never observed as "logged out"', () => {
+    const SMALL_A = 'small-A';
+    const SMALL_B = 'small-B';
+    const BIG_A = 'A'.repeat(4000);
+    const BIG_B = 'B'.repeat(2500);
+    const cases: Array<[string, string, string]> = [
+      ['small -> small', SMALL_A, SMALL_B],
+      ['small -> chunked', SMALL_A, BIG_A],
+      ['chunked -> chunked', BIG_A, BIG_B],
+      ['chunked -> small', BIG_B, SMALL_B],
+    ];
+    it.each(cases)('%s', async (_name, from, to) => {
+      await setToken(from);
+      const seen = new Set<string | null>();
+      let done = false;
+      const write = setToken(to).then(() => {
+        done = true;
+      });
+      while (!done) {
+        seen.add(await getToken());
+      }
+      await write;
+      seen.add(await getToken());
+      for (const v of seen) expect([from, to]).toContain(v);
+      expect(await getToken()).toBe(to);
+    });
+  });
 });
