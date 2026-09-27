@@ -42,11 +42,8 @@ class GoogleAuthService {
   public async startGoogleAuth(accessToken: string): Promise<GoogleAuthResponse> {
     try {
       // Get the auth URL from our backend
-      console.log('====== DEBUG: STARTING GOOGLE AUTH ======');
-      console.log(`API base URL: ${API_CONFIG.BASE_URL}`);
-      console.log(`Redirect URI: ${REDIRECT_URI}`);
-      console.log(`Has access token: ${!!accessToken}`);
-      console.log('========================================');
+      // Never log the auth URL, callback URL, tempKey or tokens: they are credentials.
+      console.log('[GoogleAuth] starting flow', { hasAccessToken: !!accessToken });
       
       // Prepare headers - only include Authorization if we have a token
       const headers: Record<string, string> = {
@@ -57,7 +54,6 @@ class GoogleAuthService {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
       
-      console.log('Requesting Google auth URL from backend...');
       const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/mobile/google`, {
         method: 'POST',
         headers,
@@ -69,7 +65,7 @@ class GoogleAuthService {
       
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Failed to get Google auth URL:', errorData);
+        console.error('[GoogleAuth] failed to get auth URL:', response.status, errorData?.error);
         throw new Error(errorData.error || 'Failed to start Google authentication');
       }
       
@@ -79,19 +75,13 @@ class GoogleAuthService {
         throw new Error('Invalid auth URL response from server');
       }
       
-      console.log('====== DEBUG: RECEIVED AUTH URL ======');
-      console.log(`Full auth URL: ${data.authUrl}`);
-      console.log('======================================');
-      
-      console.log('Opening auth session with Google auth URL');
+      console.log('[GoogleAuth] opening auth session');
       
       // Use openAuthSessionAsync which automatically handles the redirect
       const result = await WebBrowser.openAuthSessionAsync(data.authUrl, REDIRECT_URI);
       
-      console.log('====== DEBUG: AUTH SESSION RESULT ======');
-      console.log('Result type:', result.type);
-      console.log('Result:', JSON.stringify(result));
-      console.log('========================================');
+      // result.url carries the tempKey — log only the outcome type.
+      console.log('[GoogleAuth] auth session result:', result.type);
       
       if (result.type === 'success' && result.url) {
         // Parse the redirect URL to get the token or temp key
@@ -108,7 +98,7 @@ class GoogleAuthService {
         };
       }
     } catch (error) {
-      console.error('Error starting Google auth:', error);
+      console.error('[GoogleAuth] error starting flow:', error instanceof Error ? error.message : 'unknown error');
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Failed to start Google authentication'
@@ -124,18 +114,14 @@ class GoogleAuthService {
    */
   private async handleAuthCallback(url: string, accessToken: string): Promise<GoogleAuthResponse> {
     try {
-      console.log('====== DEBUG: HANDLING CALLBACK ======');
-      console.log('Callback URL:', url);
-      
-      // Parse URL parameters
+      // Parse URL parameters (the URL and params hold the tempKey — never log them)
       const params = Linking.parse(url).queryParams;
-      console.log('Parsed params:', params);
       
       const tempKey = params?.tempKey as string;
       const error = params?.error as string;
       
       if (error) {
-        console.error('Auth callback error:', error);
+        console.error('[GoogleAuth] callback returned an error:', error);
         return {
           success: false,
           message: error || 'Authentication failed'
@@ -143,15 +129,12 @@ class GoogleAuthService {
       }
       
       if (!tempKey) {
-        console.error('No temp key in callback URL');
+        console.error('[GoogleAuth] no temp key in callback URL');
         return {
           success: false,
           message: 'Invalid authentication response'
         };
       }
-      
-      console.log('Temp key received:', tempKey);
-      console.log('====================================');
       
       // Verify and claim the key
       const headers: Record<string, string> = {
@@ -162,7 +145,7 @@ class GoogleAuthService {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
       
-      console.log('Verifying temp key...');
+      console.log('[GoogleAuth] verifying temp key');
       const verifyResponse = await fetch(`${API_CONFIG.BASE_URL}/api/auth/mobile/google`, {
         method: 'POST',
         headers,
@@ -175,18 +158,14 @@ class GoogleAuthService {
       const verifyData = await verifyResponse.json();
       
       if (!verifyResponse.ok || !verifyData.success) {
-        console.error('Failed to verify temp key:', verifyData);
+        console.error('[GoogleAuth] temp key verification failed:', verifyResponse.status, verifyData?.error);
         return {
           success: false,
           message: verifyData.error || 'Failed to verify authentication'
         };
       }
       
-      console.log('====== DEBUG: AUTH SUCCESS ======');
-      console.log('Google authentication successful!');
-      console.log(`User ID: ${verifyData.user?.id}`);
-      console.log(`User email: ${verifyData.user?.email}`);
-      console.log('=================================');
+      console.log('[GoogleAuth] authentication successful');
       
       return {
         success: true,
@@ -195,7 +174,7 @@ class GoogleAuthService {
         user: verifyData.user
       };
     } catch (error) {
-      console.error('Error handling auth callback:', error);
+      console.error('[GoogleAuth] error handling callback:', error instanceof Error ? error.message : 'unknown error');
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Failed to complete authentication'

@@ -69,10 +69,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         token_type: 'bearer'
       };
       
-      console.log('Signing in with token:', { 
-        tokenLength: token.length,
-        tokenStart: token.substring(0, 10) + '...'
-      });
+      console.log('Signing in', { tokenLength: token.length });
       
       // Save the token using our auth service
       await authService.saveToken(tokenObj);

@@ -239,7 +239,7 @@ class AuthService {
           console.log('Successfully saved development token with enhanced fields');
           return enhancedToken;
         } else {
-          console.error('Invalid token response - missing access_token:', data);
+          console.error('Invalid token response - missing access_token; keys:', Object.keys(data || {}));
           throw new Error('Invalid token response');
         }
       } catch (error) {

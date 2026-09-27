@@ -48,20 +48,10 @@ class ApiService {
       throw new Error('No authentication token available');
     }
 
-    // Add debug logging to see what token is being sent
-    console.log('Token being used for auth:', {
-      tokenType: token.token_type || 'Bearer',
-      accessTokenLength: token.access_token ? token.access_token.length : 0,
-      // Don't log the full token for security reasons
-      accessTokenPrefix: token.access_token ? token.access_token.substring(0, 10) + '...' : null
-    });
-
     // Format the token according to what the server expects
     const tokenToUse = token.accessToken || token.access_token;
     const tokenType = (token.token_type || 'Bearer').toLowerCase();
     const authHeader = `${tokenType.charAt(0).toUpperCase() + tokenType.slice(1)} ${tokenToUse}`;
-    
-    console.log(`Using auth header format: ${authHeader.substring(0, 15)}...`);
     
     // Include a clear client type header to identify this as a mobile app request
     return {

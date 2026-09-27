@@ -79,7 +79,6 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
       isAxiosError: axios.isAxiosError(error),
       status: axios.isAxiosError(error) ? error.response?.status : undefined,
       data: axios.isAxiosError(error) ? error.response?.data : undefined,
-      headers: axios.isAxiosError(error) ? error.response?.headers : undefined
     });
     
     handleAuthError(error);
@@ -137,7 +136,6 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
       isAxiosError: axios.isAxiosError(error),
       status: axios.isAxiosError(error) ? error.response?.status : undefined,
       data: axios.isAxiosError(error) ? error.response?.data : undefined,
-      headers: axios.isAxiosError(error) ? error.response?.headers : undefined
     });
     
     handleAuthError(error);

@@ -261,7 +261,7 @@ const DiscordSettingsScreen: React.FC = () => {
         throw new Error('Failed to get Discord authorization URL');
       }
 
-      console.log('Opening Discord auth session:', authUrl);
+      console.log('Opening Discord auth session'); // authUrl carries OAuth state — not logged
       clearHandledCallbackUrls();
       pendingRedirectRef.current = null;
       authSessionActiveRef.current = true;

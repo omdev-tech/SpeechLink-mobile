@@ -137,7 +137,7 @@ const SignupScreen: React.FC = () => {
       
       if (!token) {
         setSignupError('Registration successful but no authentication token received');
-        console.error('No token in registration response:', response);
+        console.error('No token in registration response; keys:', Object.keys(response || {}));
         return;
       }
       
