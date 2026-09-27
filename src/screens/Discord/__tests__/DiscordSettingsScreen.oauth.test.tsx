@@ -68,12 +68,12 @@ describe('DiscordSettingsScreen - Discord OAuth in an auth session', () => {
   });
 
   it.each([
-    [`${REDIRECT}?status=error`],
-    [`${REDIRECT}?error=access_denied`],
-  ])('error redirect (%s): reports failure without claiming anything', async (url) => {
+    [`${REDIRECT}?status=error`, 'discord.authFailed'],
+    [`${REDIRECT}?error=access_denied`, 'discord.authCancelled'],
+  ])('error redirect (%s): reports %s without claiming anything', async (url, title) => {
     openAuthSession.mockResolvedValue({ type: 'success', url });
     await pressConnect();
-    await waitFor(() => expect(alertTitles()).toEqual(['discord.authFailed']));
+    await waitFor(() => expect(alertTitles()).toEqual([title]));
     expect(mockDiscord.handleDiscordCallback).not.toHaveBeenCalled();
   });
 

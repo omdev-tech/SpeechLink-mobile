@@ -50,6 +50,37 @@ export interface DiscordCallbackOptions {
   linked?: boolean;
 }
 
+export interface DiscordHandoffResult {
+  success: boolean;
+  /** Backend error code (invalid_request, invalid_handoff, exchange_failed, ...). */
+  code?: string;
+}
+
+/** API failure with the HTTP status and backend `code` when known. */
+export class DiscordApiError extends Error {
+  constructor(message: string, public status?: number, public code?: string) {
+    super(message);
+    this.name = 'DiscordApiError';
+  }
+}
+
+/** apiService throws `API request failed with status <N>: <body>`: recover status + body.code. */
+export function toDiscordApiError(error: unknown): DiscordApiError {
+  if (error instanceof DiscordApiError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const match = /status (\d{3}): ([\s\S]*)$/.exec(message);
+  let code: string | undefined;
+  if (match) {
+    try {
+      const body = JSON.parse(match[2]);
+      if (body && typeof body.code === 'string') code = body.code;
+    } catch {
+      // non-JSON body
+    }
+  }
+  return new DiscordApiError(message, match ? Number(match[1]) : undefined, code);
+}
+
 // Define a more flexible response type to handle various response formats
 interface ApiResponse<T = any> {
   data?: T;
@@ -65,31 +96,47 @@ interface ApiResponse<T = any> {
  */
 export const discordService = {
   /**
-   * Get Discord OAuth authorization URL
+   * Get the Discord OAuth authorization URL. With a PKCE `codeChallenge` (S256) the backend
+   * binds the flow to it; the verifier itself is only sent at complete-handoff.
+   * Errors: DiscordApiError (400 invalid_code_challenge, 429 rate_limited, ...).
    */
-  getAuthUrl: async (): Promise<string> => {
+  getAuthUrl: async (codeChallenge?: string): Promise<string> => {
+    const endpoint = codeChallenge
+      ? `/api/discord/auth?code_challenge=${encodeURIComponent(codeChallenge)}&code_challenge_method=S256`
+      : '/api/discord/auth';
+    let response: ApiResponse;
     try {
-      const response = await apiService.get<ApiResponse>('/api/discord/auth', false);
-      
-      // Log the full response for debugging
-      console.log('Auth URL Response:', JSON.stringify(response));
-      
-      // Check if the response has the authUrl directly at the root level
-      if (response && response.authUrl) {
-        return response.authUrl;
-      }
-      
-      // Or check if it's nested in a data property
-      if (response && response.data && response.data.authUrl) {
-        return response.data.authUrl;
-      }
-      
-      // If we get here, throw an error with details
-      console.error('Invalid authUrl response format:', response);
-      throw new Error('Failed to get Discord authorization URL: Invalid response format');
+      response = await apiService.get<ApiResponse>(endpoint, false);
     } catch (error) {
       console.error('Error getting Discord auth URL:', error);
-      throw error;
+      throw toDiscordApiError(error);
+    }
+    const authUrl = response?.authUrl || response?.data?.authUrl;
+    if (!authUrl) {
+      throw new DiscordApiError('Failed to get Discord authorization URL: Invalid response format');
+    }
+    return authUrl;
+  },
+
+  /**
+   * Finish a PKCE handoff (deep link status=pending&handoff=H) with this flow's verifier.
+   * Never throws; the verifier is never logged.
+   */
+  completeHandoff: async (handoff: string, verifier: string): Promise<DiscordHandoffResult> => {
+    try {
+      const response = await apiService.post<ApiResponse>('/api/discord/auth/mobile', {
+        operation: 'complete-handoff',
+        handoff,
+        verifier,
+      });
+      if (response && response.success === true && response.linked === true) {
+        return { success: true };
+      }
+      return { success: false, code: response?.code };
+    } catch (error) {
+      const apiError = toDiscordApiError(error);
+      console.error('Discord complete-handoff failed:', apiError.status, apiError.code);
+      return { success: false, code: apiError.code };
     }
   },
 

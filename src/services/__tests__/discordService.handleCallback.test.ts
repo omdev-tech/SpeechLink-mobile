@@ -80,3 +80,50 @@ describe('discordService.handleCallback', () => {
     expect(operations()).toEqual([]);
   });
 });
+
+describe('discordService PKCE handoff', () => {
+  const get = apiService.get as jest.Mock;
+  beforeEach(() => {
+    post.mockReset();
+    get.mockReset();
+  });
+
+  it('getAuthUrl sends only the S256 challenge (never the verifier)', async () => {
+    get.mockResolvedValue({ authUrl: 'https://discord.com/oauth2/authorize?x' });
+    const challenge = 'C'.repeat(43);
+    await expect(discordService.getAuthUrl(challenge)).resolves.toBe('https://discord.com/oauth2/authorize?x');
+    expect(get).toHaveBeenCalledWith(
+      `/api/discord/auth?code_challenge=${challenge}&code_challenge_method=S256`,
+      false
+    );
+  });
+
+  it.each([
+    [429, 'rate_limited'],
+    [400, 'invalid_code_challenge'],
+  ])('getAuthUrl surfaces HTTP %s {code:%s} as a DiscordApiError', async (status, code) => {
+    get.mockRejectedValue(new Error(`API request failed with status ${status}: {"code":"${code}"}`));
+    await expect(discordService.getAuthUrl('C'.repeat(43))).rejects.toMatchObject({ status, code });
+  });
+
+  it('completeHandoff posts handoff + verifier and succeeds on {success, linked}', async () => {
+    post.mockResolvedValue({ success: true, linked: true });
+    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toEqual({ success: true });
+    expect(post).toHaveBeenCalledWith('/api/discord/auth/mobile', {
+      operation: 'complete-handoff',
+      handoff: 'H'.repeat(43),
+      verifier: 'V'.repeat(43),
+    });
+  });
+
+  it.each(['invalid_request', 'invalid_handoff', 'exchange_failed'])('completeHandoff 400 %s -> failure with that code', async (code) => {
+    post.mockRejectedValue(new Error(`API request failed with status 400: {"code":"${code}","error":"x"}`));
+    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toEqual({ success: false, code });
+  });
+
+  it('completeHandoff after a 401 (session handled by apiService) -> failure', async () => {
+    post.mockRejectedValue(new Error('Authentication failed - please log in again'));
+    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toMatchObject({ success: false });
+  });
+});
+
