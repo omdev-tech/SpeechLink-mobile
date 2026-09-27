@@ -1,5 +1,4 @@
 import { authService, AuthToken } from './authService';
-import { SecureStorageUnavailableError } from './secureStorage';
 import { API_CONFIG } from '../config/api';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -14,7 +13,6 @@ class ApiService {
   private static instance: ApiService;
   private tokenRefreshAttempts: Map<string, number> = new Map();
   private MAX_TOKEN_REFRESH_ATTEMPTS = 1;
-  private authFailureHandled = false;
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
   private requestCache: Map<string, { data: any, timestamp: number }> = new Map();
@@ -43,7 +41,7 @@ class ApiService {
     this.requestCache.clear();
   }
 
-  private async getAuthHeaders(): Promise<HeadersInit> {
+  private async getAuthHeaders(): Promise<Record<string, string>> {
     const token = await authService.getToken();
     if (!token) {
       throw new Error('No authentication token available');
@@ -65,14 +63,16 @@ class ApiService {
     };
   }
 
+  /**
+   * A 401 with a Bearer token means the session is dead or the token was rotated. Refresh at most
+   * ONCE (single-flight, shared with concurrent requests), then retry the request at most once.
+   * Only a rejected refresh (401) signs the user out; transient refresh failures keep the session.
+   */
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<Response> {
     try {
-      // Try the request with the current token
       const headers = await this.getAuthHeaders();
       const url = `${this.baseUrl}${endpoint}`;
       console.log(`[API Request] ${options.method || 'GET'} ${url}${isRetry ? ' (retry after refresh)' : ''}`);
-      
-      console.log('Request has authorization header:', headers.hasOwnProperty('Authorization'));
       
       const response = await fetch(url, {
         ...options,
@@ -84,51 +84,32 @@ class ApiService {
       
       console.log(`[API Response] ${url} - Status: ${response.status}`);
       
-      // Handle 401 Unauthorized - attempt token refresh
-      if (response.status === 401 && !isRetry && !this.authFailureHandled) {
+      if (response.status === 401 && !isRetry) {
+        const generation = authService.getSessionGeneration();
+        // Already rotated by a concurrent/proactive refresh? Just retry with the current token.
+        const current = await this.getAuthHeaders();
+        if (current.Authorization !== headers.Authorization) {
+          return this.fetchWithAuth(endpoint, options, true);
+        }
+
         console.log('[Auth] 401 detected, attempting token refresh');
-        
-        // Prevent multiple simultaneous refresh attempts
-        if (this.authFailureHandled) {
-          console.log('[Auth] Token refresh already in progress, skipping');
-          throw new Error('Authentication failed');
+        // The API rejected the token: any refresh failure other than 429/503/network is final.
+        const outcome = await authService.refreshSession('api401'); // SecureStorageUnavailableError propagates
+        if (outcome === 'refreshed') {
+          return this.fetchWithAuth(endpoint, options, true);
         }
-        
-        // Mark that we're handling auth failure
-        this.authFailureHandled = true;
-        
-        try {
-          // Try to refresh the token
-          const refreshSuccess = await authService.refreshAccessToken();
-          
-          if (refreshSuccess) {
-            console.log('[Auth] Token refresh successful, retrying original request');
-            // Reset the flag since refresh succeeded
-            this.authFailureHandled = false;
-            // Retry the original request with the new token
+        if (outcome === 'transient') {
+          // A new token may exist only in memory (storage write failed): use it.
+          const latest = await authService.getToken();
+          if (latest && `Bearer ${latest.access_token}` !== headers.Authorization) {
             return this.fetchWithAuth(endpoint, options, true);
-          } else {
-            console.log('[Auth] Token refresh failed, logging out user');
-            // Refresh failed, trigger logout
-            authService.triggerAuthFailedCallbacks();
-            throw new Error('Authentication failed - please log in again');
           }
-        } catch (refreshError) {
-          if (refreshError instanceof SecureStorageUnavailableError) {
-            // Token unreadable right now (keychain locked) — don't log the user out.
-            this.authFailureHandled = false;
-            throw refreshError;
-          }
-          console.error('[Auth] Token refresh error:', refreshError);
-          // Ensure logout is triggered
-          authService.triggerAuthFailedCallbacks();
-          throw new Error('Authentication failed - please log in again');
+          throw new Error('Session could not be verified right now - please try again');
         }
-      }
-      
-      // Reset auth failure flag for successful requests
-      if (response.ok) {
-        this.authFailureHandled = false;
+        // 'invalid' already ended the session (once). 'no_token': the token we sent has been
+        // cleared meanwhile; end that session only if nobody else already did.
+        if (outcome === 'no_token') await authService.endSession(generation);
+        throw new Error('Authentication failed - please log in again');
       }
       
       if (!response.ok) {
@@ -145,10 +126,6 @@ class ApiService {
       
       return response;
     } catch (error) {
-      // Only reset if this is not an auth error
-      if (!(error instanceof Error && error.message.includes('Authentication failed'))) {
-        this.authFailureHandled = false;
-      }
       console.error('API fetch error:', error);
       throw error;
     }
@@ -239,11 +216,6 @@ class ApiService {
       console.error(`DELETE ${endpoint} failed:`, error);
       throw error;
     }
-  }
-
-  // Reset auth failure handling flag - call this when user logs in again
-  public resetAuthFailureHandled(): void {
-    this.authFailureHandled = false;
   }
 
   // Clear all token refresh attempts

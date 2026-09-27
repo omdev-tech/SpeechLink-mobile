@@ -4,9 +4,11 @@ jest.mock('../../services/authService', () => ({
     onAuthenticationFailed: jest.fn(),
     saveToken: jest.fn(),
     clearToken: jest.fn(),
+    refreshIfNeeded: jest.fn(async () => 'not_needed'),
+    canLogoutEverywhere: jest.fn(async () => false),
   },
 }));
-jest.mock('../../services/apiService', () => ({ apiService: { resetAuthFailureHandled: jest.fn() } }));
+jest.mock('../../services/apiService', () => ({ apiService: {} }));
 jest.mock('../../services/googleAuthService', () => ({ __esModule: true, default: { startGoogleAuth: jest.fn() } }));
 
 import React, { useContext } from 'react';

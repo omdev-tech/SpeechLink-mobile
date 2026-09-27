@@ -150,7 +150,7 @@ const SignupScreen: React.FC = () => {
             text: 'Sign In', 
             onPress: () => {
               // Auto login after successful registration
-              signIn(token);
+              signIn(token, response);
             } 
           }
         ]

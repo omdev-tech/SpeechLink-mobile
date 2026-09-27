@@ -76,6 +76,7 @@ import { apiService } from '../../services/apiService';
 import { aacService } from '../../services/aacService';
 import { AACPreferences } from '../../models/AAC';
 import webAuthService from '../../services/webAuthService';
+import LogoutEverywhereButton from '../../components/SettingsScreen/LogoutEverywhereButton';
 
 const SettingsScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -767,6 +768,8 @@ const SettingsScreen: React.FC = () => {
           <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
           <Text style={styles.logoutButtonText}>{t('settings.logout')}</Text>
         </TouchableOpacity>
+
+        <LogoutEverywhereButton />
 
         <TouchableOpacity 
           style={styles.bugReportButton} 

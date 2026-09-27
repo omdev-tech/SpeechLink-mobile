@@ -1,14 +1,20 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authService } from '../services/authService';
+import { authService, AuthToken } from '../services/authService';
 import { SecureStorageUnavailableError } from '../services/secureStorage';
-import { apiService } from '../services/apiService';
 import googleAuthService from '../services/googleAuthService';
 
+/** Expiry fields of a login / register / Google verify response (all optional). */
+export type TokenExpiryInfo = Pick<AuthToken, 'expires_in' | 'expires_at'>;
+
 interface AuthContextType {
-  signIn: (token: string) => Promise<void>;
+  signIn: (token: string, expiry?: TokenExpiryInfo) => Promise<void>;
   signOut: () => Promise<void>;
+  /** End every session of this account (all devices). Throws (and keeps this session) on failure. */
+  signOutEverywhere: () => Promise<void>;
+  /** The backend that issued this session supports logging out everywhere (hide the UI otherwise). */
+  canSignOutEverywhere: boolean;
   loginWithGoogle: () => Promise<boolean>;
   token: string | null;
   isLoading: boolean;
@@ -19,6 +25,8 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   signIn: async () => {},
   signOut: async () => {},
+  signOutEverywhere: async () => {},
+  canSignOutEverywhere: false,
   loginWithGoogle: async () => false,
   token: null,
   isLoading: true,
@@ -31,14 +39,24 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [userToken, setUserToken] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticatingWithGoogle, setIsAuthenticatingWithGoogle] = useState(false);
+  const [canSignOutEverywhere, setCanSignOutEverywhere] = useState(false);
+  const userTokenRef = useRef<string | null>(null);
+  userTokenRef.current = userToken;
+  const signingOutRef = useRef(false);
 
-  // Set up auth failure listener
+  // Set up auth failure listener. Idempotent: several in-flight requests may all report the dead
+  // session; sign out once, and not at all when already signed out.
   useEffect(() => {
-    // Register callback for auth failures
-    authService.onAuthenticationFailed(() => {
+    authService.onAuthenticationFailed(async () => {
+      if (!userTokenRef.current || signingOutRef.current) return;
+      signingOutRef.current = true;
       console.log('Authentication failed, redirecting to login');
       setAuthError('Your session has expired. Please sign in again.');
-      signOut();
+      try {
+        await signOut();
+      } finally {
+        signingOutRef.current = false;
+      }
     });
   }, []);
 
@@ -110,7 +128,64 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     };
   }, []);
 
-  const signIn = async (token: string) => {
+  // Proactive token refresh: on launch (once signed in) and whenever the app returns to the
+  // foreground. authService decides whether a refresh is due and never signs out on transient
+  // failures; a rejected session (401) goes through onAuthenticationFailed above.
+  const isSignedIn = !!userToken;
+  const refreshCheckRunning = useRef(false);
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let active = true;
+    let lastAppState: AppStateStatus = AppState.currentState;
+
+    const check = async () => {
+      if (refreshCheckRunning.current) return;
+      refreshCheckRunning.current = true;
+      try {
+        const outcome = await authService.refreshIfNeeded();
+        if (outcome === 'refreshed' && active) {
+          const refreshed = await authService.getToken();
+          if (active && refreshed?.access_token) setUserToken(refreshed.access_token);
+        }
+      } catch (e) {
+        console.warn('[Auth] proactive refresh check failed');
+      } finally {
+        refreshCheckRunning.current = false;
+      }
+    };
+
+    check();
+    const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      const becameActive = next === 'active' && lastAppState !== 'active';
+      lastAppState = next;
+      if (becameActive) check();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [isSignedIn]);
+
+  // Log-out-everywhere capability follows the current session (new backend vs current prod).
+  useEffect(() => {
+    if (!userToken) {
+      setCanSignOutEverywhere(false);
+      return;
+    }
+    let active = true;
+    Promise.resolve(authService.canLogoutEverywhere?.())
+      .then((supported) => {
+        if (active) setCanSignOutEverywhere(!!supported);
+      })
+      .catch(() => {
+        if (active) setCanSignOutEverywhere(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userToken]);
+
+  const signIn = async (token: string, expiry?: TokenExpiryInfo) => {
     try {
       if (!token) {
         console.error('Attempted to sign in with null/undefined token');
@@ -119,9 +194,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       }
       
       // Instead of just saving the token string, create a proper token object
-      const tokenObj = {
+      const tokenObj: AuthToken = {
         access_token: token,
-        token_type: 'bearer'
+        token_type: 'bearer',
+        expires_in: expiry?.expires_in,
+        expires_at: expiry?.expires_at,
       };
       
       console.log('Signing in', { tokenLength: token.length });
@@ -133,9 +210,6 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       setUserToken(token);
       setAuthError(null);
       
-      // Reset auth failure flag when user logs in
-      apiService.resetAuthFailureHandled();
-      
       console.log('Successfully signed in and saved token');
     } catch (e) {
       console.error('Failed to save auth token', e);
@@ -146,10 +220,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const signOut = async () => {
     try {
       await authService.clearToken();
+      userTokenRef.current = null;
       setUserToken(null);
     } catch (e) {
       console.error('Failed to remove auth token', e);
     }
+  };
+
+  const signOutEverywhere = async () => {
+    await authService.logoutEverywhere(); // throws -> this session is kept, caller shows the error
+    setUserToken(null);
   };
 
   // Function to authenticate with Google
@@ -170,7 +250,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       
       // If we got a new token from Google auth, update it
       if (result.access_token) {
-        await signIn(result.access_token);
+        await signIn(result.access_token, result);
       }
       
       return true;
@@ -185,6 +265,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const authContext = {
     signIn,
     signOut,
+    signOutEverywhere,
+    canSignOutEverywhere,
     loginWithGoogle,
     token: userToken,
     isLoading,

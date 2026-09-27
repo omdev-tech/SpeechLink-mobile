@@ -8,6 +8,9 @@ export interface GoogleAuthResponse {
   success: boolean;
   message?: string;
   access_token?: string;
+  /** Token lifetime in seconds / expiry in unix seconds (backend >= session-revocation release). */
+  expires_in?: number;
+  expires_at?: number;
   user?: {
     id: string;
     email?: string;
@@ -171,6 +174,8 @@ class GoogleAuthService {
         success: true,
         message: 'Successfully authenticated with Google',
         access_token: verifyData.access_token,
+        expires_in: verifyData.expires_in,
+        expires_at: verifyData.expires_at,
         user: verifyData.user
       };
     } catch (error) {
