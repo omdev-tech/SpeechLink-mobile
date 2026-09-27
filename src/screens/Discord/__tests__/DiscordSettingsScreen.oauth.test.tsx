@@ -44,6 +44,14 @@ describe('DiscordSettingsScreen - Discord OAuth in an auth session', () => {
     expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledWith('', expect.objectContaining({ tempKey: 'abc123' }));
   });
 
+  it('success redirect with linked=1 (new backend): confirmed link, success alert', async () => {
+    openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success&linked=1` });
+    await pressConnect();
+    await waitFor(() => expect(alertTitles()).toEqual(['discord.authSuccess']));
+    expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1);
+    expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledWith('', expect.objectContaining({ linked: true }));
+  });
+
   it('success redirect with a raw code: exchanges the code', async () => {
     openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?code=the%2Fcode` });
     await pressConnect();

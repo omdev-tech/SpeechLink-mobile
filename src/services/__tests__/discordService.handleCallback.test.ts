@@ -72,4 +72,11 @@ describe('discordService.handleCallback', () => {
     expect(operations()).not.toContain('check-temp-keys');
     expect((discordService as any).checkPendingAuth).toBeUndefined();
   });
+
+  it('linked (new backend: code already exchanged for this user) is a confirmed fresh link, no request', async () => {
+    fakeMobileAuth({ linked: false });
+    await expect(discordService.handleCallback('', { linked: true, requireFreshAuth: true })).resolves.toBe(true);
+    await expect(discordService.handleCallback('', { linked: true, tempKey: 'ignored' })).resolves.toBe(true);
+    expect(operations()).toEqual([]);
+  });
 });

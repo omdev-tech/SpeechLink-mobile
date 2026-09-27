@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { Alert, AppState, AppStateStatus } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { discordService, DiscordServer, DiscordChannel, DiscordSettings, ConnectionStatus, DiscordCallbackOptions } from '../services/discordService';
+import { consumeInitialDiscordCallbackUrl } from '../services/discordCallbackLinks';
+import { isDiscordCallbackError, parseDiscordCallbackUrl } from '../services/discordOAuthRedirect';
 
 interface DiscordContextType {
   isConnected: boolean;
@@ -30,6 +33,7 @@ interface DiscordContextType {
 const DiscordContext = createContext<DiscordContextType | undefined>(undefined);
 
 export const DiscordProvider = ({ children }: { children: ReactNode }) => {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -424,6 +428,33 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
       subscription.remove();
     };
   }, [isConnected, discordSettings, disconnect, refreshConnectionStatus]);
+
+  // Cold start from the OAuth callback deep link (the app was killed while the browser was
+  // open): claim it app-wide right away instead of waiting for the Discord screen to mount.
+  const handleDiscordCallbackRef = useRef(handleDiscordCallback);
+  handleDiscordCallbackRef.current = handleDiscordCallback;
+  useEffect(() => {
+    consumeInitialDiscordCallbackUrl()
+      .then(async (url) => {
+        if (!url) return;
+        const params = parseDiscordCallbackUrl(url);
+        if (isDiscordCallbackError(params)) {
+          Alert.alert(t('discord.authFailed'), t('discord.authFailedMessage'));
+          return;
+        }
+        if (!params.code && !params.tempKey && params.status !== 'success') return;
+        // Reloads the settings on success.
+        const success = await handleDiscordCallbackRef.current(params.code ?? '', {
+          tempKey: params.tempKey,
+          linked: params.linked,
+        });
+        Alert.alert(
+          t(success ? 'discord.authSuccess' : 'discord.authFailed'),
+          t(success ? 'discord.authSuccessMessage' : 'discord.authFailedMessage')
+        );
+      })
+      .catch((err) => console.error('Error handling Discord launch URL:', err));
+  }, []);
 
   const contextValue = useMemo<DiscordContextType>(() => ({
     isConnected,

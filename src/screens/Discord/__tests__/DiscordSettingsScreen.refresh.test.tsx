@@ -4,6 +4,7 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import * as WebBrowser from 'expo-web-browser';
 import DiscordSettingsScreen from '../DiscordSettingsScreen';
 
+const REDIRECT = 'com.naqued.speechlinkmobile://discord-callback';
 const openAuthSession = WebBrowser.openAuthSessionAsync as jest.Mock;
 const openBrowser = WebBrowser.openBrowserAsync as jest.Mock;
 
@@ -72,18 +73,38 @@ describe('DiscordSettingsScreen - "Refresh connection" (re-authenticate Discord)
     expect(openedUrls()).toEqual([]);
   });
 
-  it.each([
-    ['with tempKey', `com.naqued.speechlinkmobile://discord-callback?status=success&tempKey=fresh`, 'fresh'],
-    ['without tempKey', `com.naqued.speechlinkmobile://discord-callback?status=success`, undefined],
-  ])('success redirect %s: claim still requires a fresh auth (no stale check-auth)', async (_label, url, key) => {
+  it('success redirect with tempKey (older backend): the claim requires a fresh auth', async () => {
     autoPressAlert('destructive');
-    openAuthSession.mockResolvedValue({ type: 'success', url });
+    openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success&tempKey=fresh` });
     const screen = render(<DiscordSettingsScreen />);
     fireEvent.press(await screen.findByText('discord.refreshConnection'));
     await waitFor(() => expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1));
     const [, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
-    expect(options.requireFreshAuth).toBe(true);
-    expect(options.tempKey).toBe(key);
+    expect(options).toMatchObject({ requireFreshAuth: true, tempKey: 'fresh', linked: false });
+  });
+
+  it('success redirect with linked=1 (new backend): refresh succeeds and settings are reloaded', async () => {
+    const alertSpy = autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success&linked=1` });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(alertSpy.mock.calls.map((c) => c[0])).toContain('discord.authSuccess'));
+    const [, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
+    expect(options).toMatchObject({ linked: true, requireFreshAuth: true });
+    expect(alertSpy.mock.calls.map((c) => c[0])).not.toContain('discord.authFailed');
+  });
+
+  it('bare status=success (neither linked=1 nor tempKey) on refresh cannot prove fresh tokens', async () => {
+    const alertSpy = autoPressAlert('destructive');
+    // What the real service answers for requireFreshAuth without key/code/linked.
+    mockDiscord.handleDiscordCallback.mockImplementation(async (_c: string, o: any) => !o.requireFreshAuth || !!o.linked || !!o.tempKey);
+    openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success` });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(alertSpy.mock.calls.map((c) => c[0])).toContain('discord.authFailed'));
+    const [, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
+    expect(options).toMatchObject({ requireFreshAuth: true, linked: false });
+    expect(options.tempKey).toBeUndefined();
   });
 
   it('cancel/dismiss during a refresh: nothing can prove fresh auth, so no claim request at all', async () => {

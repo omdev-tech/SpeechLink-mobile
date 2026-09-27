@@ -43,6 +43,11 @@ export interface DiscordCallbackOptions {
    * Discord link (`check-auth`) is NOT enough, since its tokens are the ones being replaced.
    */
   requireFreshAuth?: boolean;
+  /**
+   * The callback deep link said `linked=1`: the backend already exchanged the code for the
+   * signed-in user (signed OAuth state). Confirmed and fresh, nothing left to claim.
+   */
+  linked?: boolean;
 }
 
 // Define a more flexible response type to handle various response formats
@@ -90,6 +95,7 @@ export const discordService = {
 
   /**
    * Complete a Discord OAuth flow started from the app. One decision, no polling:
+   * 0. `options.linked` (deep link `linked=1`, current backend) -> already linked, true.
    * 1. `options.tempKey` (handed back by the callback page deep link) -> verify-temp-key;
    *    its answer is final (a failed claim is a failure, there is no fallback).
    * 2. `code` -> process-code.
@@ -101,8 +107,12 @@ export const discordService = {
    * ANY user.
    */
   handleCallback: async (code: string, options: DiscordCallbackOptions = {}): Promise<boolean> => {
-    const { tempKey, requireFreshAuth = false } = options;
+    const { tempKey, requireFreshAuth = false, linked = false } = options;
     try {
+      if (linked) {
+        return true;
+      }
+
       if (tempKey) {
         return await discordService.verifyTempKey(tempKey);
       }

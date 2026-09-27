@@ -17,13 +17,24 @@ describe('discord OAuth redirect deep link', () => {
       tempKey: 'a+b',
       code: 'c',
       error: undefined,
+      linked: false,
     });
-    expect(parseDiscordCallbackUrl(DISCORD_OAUTH_REDIRECT_URL)).toEqual({});
+    expect(parseDiscordCallbackUrl(DISCORD_OAUTH_REDIRECT_URL)).toEqual({ linked: false });
   });
 
   it('flags errors', () => {
     expect(isDiscordCallbackError(parseDiscordCallbackUrl(`${DISCORD_OAUTH_REDIRECT_URL}?status=error`))).toBe(true);
     expect(isDiscordCallbackError(parseDiscordCallbackUrl(`${DISCORD_OAUTH_REDIRECT_URL}?error=access_denied`))).toBe(true);
     expect(isDiscordCallbackError(parseDiscordCallbackUrl(`${DISCORD_OAUTH_REDIRECT_URL}?status=success`))).toBe(false);
+  });
+
+  it('parses linked=1 (backend already exchanged the code for the signed-in user)', () => {
+    expect(parseDiscordCallbackUrl(`${DISCORD_OAUTH_REDIRECT_URL}?status=success&linked=1`)).toMatchObject({
+      status: 'success',
+      linked: true,
+    });
+    expect(parseDiscordCallbackUrl(`${DISCORD_OAUTH_REDIRECT_URL}?status=success&linked=0`).linked).toBe(false);
+    // linked only counts together with a success status
+    expect(parseDiscordCallbackUrl(`${DISCORD_OAUTH_REDIRECT_URL}?status=error&linked=1`).linked).toBe(false);
   });
 });

@@ -6,10 +6,13 @@
  *
  * Contract (query parameters, all optional):
  *   status  = "success" | "error"
- *   tempKey = key of the TempDiscordAuth row the callback stored (claimed via verify-temp-key).
- *             REQUIRED whenever the callback stored the code instead of exchanging it: the app
- *             never asks for "any pending key", and a re-auth (Refresh connection) only succeeds
- *             with a tempKey or code.
+ *   linked  = "1" with status=success: the backend (signed OAuth state bound to the calling
+ *             user) already exchanged the code for that user, so the link is confirmed and
+ *             FRESH (counts even for a re-auth). Current backend: `?status=success&linked=1`.
+ *   tempKey = (older backend, kept for the transition) key of the TempDiscordAuth row the
+ *             callback stored, claimed via verify-temp-key. The app never asks for "any pending
+ *             key"; without linked=1, tempKey or code a re-auth (Refresh connection) cannot be
+ *             confirmed and a first connect falls back to one check-auth.
  *   code    = raw Discord OAuth code (exchanged via process-code), if the backend did not store it
  *   error   = Discord/OAuth error (e.g. "access_denied"); implies failure
  */
@@ -20,6 +23,8 @@ export interface DiscordCallbackParams {
   tempKey?: string;
   code?: string;
   error?: string;
+  /** status=success&linked=1: the backend already linked the account for this user. */
+  linked: boolean;
 }
 
 /** Parses the query string of a discord-callback deep link (no reliance on URL/searchParams). */
@@ -40,6 +45,7 @@ export function parseDiscordCallbackUrl(url: string): DiscordCallbackParams {
     tempKey: params.tempKey || undefined,
     code: params.code || undefined,
     error: params.error || undefined,
+    linked: params.status === 'success' && params.linked === '1',
   };
 }
 

@@ -36,20 +36,7 @@ import {
   isDiscordCallbackError,
   parseDiscordCallbackUrl,
 } from '../../services/discordOAuthRedirect';
-
-// discord-callback deep links already acted on (process-wide, survives re-mounts), so a
-// URL delivered twice (auth session result + Linking on Android, or a late duplicate) is
-// handled once. Cleared when a new auth session starts.
-const handledCallbackUrls = new Set<string>();
-// Linking.getInitialURL() returns the launch URL for the whole process life: consume it once.
-let initialUrlConsumed = false;
-
-/** Marks a discord-callback URL as handled; false if it already was. */
-function claimCallbackUrl(url: string): boolean {
-  if (handledCallbackUrls.has(url)) return false;
-  handledCallbackUrls.add(url);
-  return true;
-}
+import { claimCallbackUrl, clearHandledCallbackUrls } from '../../services/discordCallbackLinks';
 
 const DiscordSettingsScreen: React.FC = () => {
   // Move all hooks to the top level of the component function
@@ -162,7 +149,10 @@ const DiscordSettingsScreen: React.FC = () => {
       return;
     }
     try {
-      const success = await handleDiscordCallback(params.code ?? '', { tempKey: params.tempKey });
+      const success = await handleDiscordCallback(params.code ?? '', {
+        tempKey: params.tempKey,
+        linked: params.linked,
+      });
       if (success) {
         Alert.alert(
           t('discord.authSuccess'),
@@ -189,20 +179,12 @@ const DiscordSettingsScreen: React.FC = () => {
   const handleDeepLinkRef = useRef(handleDeepLink);
   handleDeepLinkRef.current = handleDeepLink;
 
-  // Handle deep link for Discord OAuth callback: subscribe once, consume the launch URL once.
+  // Runtime deep links for the Discord OAuth callback: subscribe once. The cold-start launch
+  // URL is claimed app-wide by DiscordProvider, not here.
   useEffect(() => {
     const subscription = Linking.addEventListener('url', (event) => {
       handleDeepLinkRef.current(event);
     });
-
-    if (!initialUrlConsumed) {
-      initialUrlConsumed = true;
-      Linking.getInitialURL().then((url) => {
-        if (url) {
-          handleDeepLinkRef.current({ url });
-        }
-      });
-    }
 
     return () => {
       subscription.remove();
@@ -223,7 +205,7 @@ const DiscordSettingsScreen: React.FC = () => {
       }
 
       console.log('Opening Discord auth session:', authUrl);
-      handledCallbackUrls.clear();
+      clearHandledCallbackUrls();
       pendingRedirectRef.current = null;
       authSessionActiveRef.current = true;
       // Closes the in-app browser by itself when the callback page redirects to
@@ -243,10 +225,12 @@ const DiscordSettingsScreen: React.FC = () => {
         if (isDiscordCallbackError(params)) {
           success = false;
         } else {
-          // Claim exactly what the backend handed back. On re-auth an existing link is
-          // not proof that the new code was exchanged (requireFreshAuth).
+          // Claim exactly what the backend handed back. linked=1 is a confirmed fresh link;
+          // otherwise, on re-auth an existing link is not proof that the new code was
+          // exchanged (requireFreshAuth).
           success = await handleDiscordCallback(params.code ?? '', {
             tempKey: params.tempKey,
+            linked: params.linked,
             requireFreshAuth: reauth,
           });
         }
