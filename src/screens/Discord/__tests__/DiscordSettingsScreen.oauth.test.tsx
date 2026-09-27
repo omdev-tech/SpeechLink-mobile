@@ -51,7 +51,7 @@ describe('DiscordSettingsScreen - Discord OAuth in an auth session', () => {
     expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledWith('the/code', expect.anything());
   });
 
-  it('success redirect with status=success only: trusts the backend and claims any pending key', async () => {
+  it('success redirect with status=success only (first connect): no key to claim, one check-auth decides', async () => {
     openAuthSession.mockResolvedValue({ type: 'success', url: `${REDIRECT}?status=success` });
     await pressConnect();
     await waitFor(() => expect(alertTitles()).toEqual(['discord.authSuccess']));
@@ -70,13 +70,17 @@ describe('DiscordSettingsScreen - Discord OAuth in an auth session', () => {
   });
 
   it.each(['cancel', 'dismiss'])(
-    '%s after completing OAuth on a page that did not redirect: finds the pending auth (fallback poll)',
+    '%s after completing OAuth on a page that did not redirect: one check-auth, no polling',
     async (type) => {
       openAuthSession.mockResolvedValue({ type });
       mockDiscord.handleDiscordCallback.mockResolvedValue(true);
       await pressConnect();
       await waitFor(() => expect(alertTitles()).toEqual(['discord.authSuccess']));
-      expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledWith('', expect.objectContaining({ requireFreshAuth: false }));
+      expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1);
+      const [code, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
+      expect(code).toBe('');
+      expect(options.tempKey).toBeUndefined();
+      expect(options.requireFreshAuth).toBe(false);
     }
   );
 
@@ -122,5 +126,47 @@ describe('DiscordSettingsScreen - Discord OAuth in an auth session', () => {
     await waitFor(() =>
       expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledWith('', expect.objectContaining({ tempKey: 'late' }))
     );
+  });
+
+  it('Android: session resolves "dismiss" but the redirect arrived via Linking -> uses it, once', async () => {
+    let emitUrl: (e: { url: string }) => void = () => {};
+    jest.spyOn(Linking, 'addEventListener').mockImplementation(((_type: string, handler: any) => {
+      emitUrl = handler;
+      return { remove: jest.fn() };
+    }) as any);
+
+    let finishSession: (r: any) => void = () => {};
+    openAuthSession.mockReturnValue(new Promise((resolve) => (finishSession = resolve)));
+
+    await pressConnect();
+    const url = `${REDIRECT}?status=success&tempKey=android`;
+    await act(async () => emitUrl({ url }));
+    await act(async () => finishSession({ type: 'dismiss' }));
+    await waitFor(() => expect(alertTitles()).toEqual(['discord.authSuccess']));
+    expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1);
+    expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledWith('', expect.objectContaining({ tempKey: 'android' }));
+
+    // A late (duplicate) delivery of the same redirect must not be handled again.
+    await act(async () => emitUrl({ url }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1);
+    expect(alertTitles()).toEqual(['discord.authSuccess']);
+  });
+
+  it('late duplicate of a redirect already handled by the auth session is ignored', async () => {
+    let emitUrl: (e: { url: string }) => void = () => {};
+    jest.spyOn(Linking, 'addEventListener').mockImplementation(((_type: string, handler: any) => {
+      emitUrl = handler;
+      return { remove: jest.fn() };
+    }) as any);
+    const url = `${REDIRECT}?status=success&tempKey=dup`;
+    openAuthSession.mockResolvedValue({ type: 'success', url });
+
+    await pressConnect();
+    await waitFor(() => expect(alertTitles()).toEqual(['discord.authSuccess']));
+    await act(async () => emitUrl({ url }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1);
+    expect(alertTitles()).toEqual(['discord.authSuccess']);
   });
 });

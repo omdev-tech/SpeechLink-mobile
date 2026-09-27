@@ -43,8 +43,6 @@ export interface DiscordCallbackOptions {
    * Discord link (`check-auth`) is NOT enough, since its tokens are the ones being replaced.
    */
   requireFreshAuth?: boolean;
-  /** Polling attempts (about 1s apart) before giving up. Defaults to 30. */
-  maxAttempts?: number;
 }
 
 // Define a more flexible response type to handle various response formats
@@ -91,96 +89,53 @@ export const discordService = {
   },
 
   /**
-   * Complete a Discord OAuth flow started from the app.
+   * Complete a Discord OAuth flow started from the app. One decision, no polling:
+   * 1. `options.tempKey` (handed back by the callback page deep link) -> verify-temp-key;
+   *    its answer is final (a failed claim is a failure, there is no fallback).
+   * 2. `code` -> process-code.
+   * 3. Otherwise a single `check-auth` (a DiscordConnection row exists). Skipped when
+   *    `requireFreshAuth` is set: during a re-authentication the old row already exists,
+   *    so it would report success without the new OAuth code ever being exchanged.
    *
-   * Order of evidence, strongest first:
-   * 1. `options.tempKey` / `code` handed back by the backend (deep link) -> claim it directly.
-   * 2. A pending (unclaimed) temp key stored by /api/discord/callback -> claim it.
-   * 3. `check-auth` (a DiscordConnection row exists). Skipped when `requireFreshAuth` is set:
-   *    during a re-authentication the old row already exists, so it would report success
-   *    without the new OAuth code ever being exchanged (i.e. without renewing the tokens).
+   * `check-temp-keys` is deliberately never used: it returns the newest unclaimed key of
+   * ANY user.
    */
   handleCallback: async (code: string, options: DiscordCallbackOptions = {}): Promise<boolean> => {
-    const { tempKey, requireFreshAuth = false, maxAttempts = 30 } = options;
+    const { tempKey, requireFreshAuth = false } = options;
     try {
       if (tempKey) {
-        if (await discordService.verifyTempKey(tempKey)) {
-          return true;
-        }
-        console.log('Temp key from deep link could not be claimed, falling back to polling');
+        return await discordService.verifyTempKey(tempKey);
       }
 
-      // Direct processing if we have a code
       if (code) {
         try {
           const response = await apiService.post<ApiResponse>('/api/discord/auth/mobile', {
             operation: 'process-code',
             code: code
           });
-
-          if (response.success || (response.data && response.data.success)) {
-            return true;
-          }
+          return !!(response.success || (response.data && response.data.success));
         } catch (err) {
-          console.log('Direct code processing failed, will check for temp keys');
+          console.log('Direct Discord code processing failed');
+          return false;
         }
       }
 
-      console.log('Polling for authentication completion...');
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          // Claim a temp key stored by the callback page (Custom Tab without a web session).
-          const pendingKey = await discordService.checkPendingAuth();
-          if (pendingKey) {
-            console.log('Found pending Discord auth during polling');
-            if (await discordService.verifyTempKey(pendingKey)) {
-              return true;
-            }
-          }
-
-          if (!requireFreshAuth) {
-            const checkResponse = await apiService.post<ApiResponse>('/api/discord/auth/mobile', {
-              operation: 'check-auth'
-            });
-            if (checkResponse.isAuthenticated ||
-               (checkResponse.data && checkResponse.data.isAuthenticated)) {
-              return true;
-            }
-          }
-        } catch (err) {
-          console.error('Error during Discord auth polling:',
-            err instanceof Error ? err.message : 'Unknown error');
-        }
-
-        if (attempt < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+      if (requireFreshAuth) {
+        console.log('Re-authentication without a temp key or code cannot be confirmed');
+        return false;
       }
 
-      console.log('Polling complete without finding a valid auth token');
-      return false;
+      const checkResponse = await apiService.post<ApiResponse>('/api/discord/auth/mobile', {
+        operation: 'check-auth'
+      });
+      return !!(checkResponse.isAuthenticated ||
+        (checkResponse.data && checkResponse.data.isAuthenticated));
     } catch (error) {
       console.error('Error handling Discord callback:', error);
       throw error;
     }
   },
 
-  /**
-   * Check for pending auth requests
-   */
-  checkPendingAuth: async (): Promise<string | null> => {
-    try {
-      const response = await apiService.post<ApiResponse>('/api/discord/auth/mobile', {
-        operation: 'check-temp-keys'
-      });
-      
-      return response.tempKey || response.data?.tempKey || null;
-    } catch (error) {
-      console.error('Error checking pending auth:', error);
-      return null;
-    }
-  },
-  
   /**
    * Verify a temporary authentication key
    */

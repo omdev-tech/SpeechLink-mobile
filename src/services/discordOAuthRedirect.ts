@@ -6,7 +6,10 @@
  *
  * Contract (query parameters, all optional):
  *   status  = "success" | "error"
- *   tempKey = key of the TempDiscordAuth row the callback stored (claimed via verify-temp-key)
+ *   tempKey = key of the TempDiscordAuth row the callback stored (claimed via verify-temp-key).
+ *             REQUIRED whenever the callback stored the code instead of exchanging it: the app
+ *             never asks for "any pending key", and a re-auth (Refresh connection) only succeeds
+ *             with a tempKey or code.
  *   code    = raw Discord OAuth code (exchanged via process-code), if the backend did not store it
  *   error   = Discord/OAuth error (e.g. "access_denied"); implies failure
  */

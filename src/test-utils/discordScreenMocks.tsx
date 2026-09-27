@@ -28,8 +28,18 @@ export const mockDiscord = {
   refreshConnectionStatus: jest.fn(),
 };
 
+/** freshIdentities: return new function identities on every render (unmemoized provider). */
+export const mockDiscordConfig = { freshIdentities: false };
+
 jest.mock('../contexts/DiscordContext', () => ({
-  useDiscord: () => mockDiscord,
+  useDiscord: () => {
+    if (!mockDiscordConfig.freshIdentities) return mockDiscord;
+    const fresh: Record<string, unknown> = { ...mockDiscord };
+    for (const [key, value] of Object.entries(mockDiscord)) {
+      if (typeof value === 'function') fresh[key] = (...args: unknown[]) => (value as any)(...args);
+    }
+    return fresh;
+  },
 }));
 
 jest.mock('../contexts/AuthContext', () => {

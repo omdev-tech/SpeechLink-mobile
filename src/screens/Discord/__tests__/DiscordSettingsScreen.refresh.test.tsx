@@ -37,6 +37,10 @@ describe('DiscordSettingsScreen - "Refresh connection" (re-authenticate Discord)
     // Visible in both the WIP (isConnected-gated) and the fixed screen.
     mockDiscord.isConnected = true;
     const alertSpy = autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({
+      type: 'success',
+      url: 'com.naqued.speechlinkmobile://discord-callback?status=success&tempKey=t',
+    });
 
     const screen = render(<DiscordSettingsScreen />);
     fireEvent.press(await screen.findByText('discord.refreshConnection'));
@@ -66,5 +70,29 @@ describe('DiscordSettingsScreen - "Refresh connection" (re-authenticate Discord)
     await new Promise((r) => setTimeout(r, 0));
     expect(mockDiscord.getDiscordAuthUrl).not.toHaveBeenCalled();
     expect(openedUrls()).toEqual([]);
+  });
+
+  it.each([
+    ['with tempKey', `com.naqued.speechlinkmobile://discord-callback?status=success&tempKey=fresh`, 'fresh'],
+    ['without tempKey', `com.naqued.speechlinkmobile://discord-callback?status=success`, undefined],
+  ])('success redirect %s: claim still requires a fresh auth (no stale check-auth)', async (_label, url, key) => {
+    autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({ type: 'success', url });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(mockDiscord.handleDiscordCallback).toHaveBeenCalledTimes(1));
+    const [, options] = mockDiscord.handleDiscordCallback.mock.calls[0];
+    expect(options.requireFreshAuth).toBe(true);
+    expect(options.tempKey).toBe(key);
+  });
+
+  it('cancel/dismiss during a refresh: nothing can prove fresh auth, so no claim request at all', async () => {
+    autoPressAlert('destructive');
+    openAuthSession.mockResolvedValue({ type: 'dismiss' });
+    const screen = render(<DiscordSettingsScreen />);
+    fireEvent.press(await screen.findByText('discord.refreshConnection'));
+    await waitFor(() => expect(openAuthSession).toHaveBeenCalled());
+    await waitFor(() => expect(mockDiscord.loadSettings).toHaveBeenCalledTimes(2)); // mount + resync
+    expect(mockDiscord.handleDiscordCallback).not.toHaveBeenCalled();
   });
 });

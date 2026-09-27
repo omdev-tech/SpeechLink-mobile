@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { discordService, DiscordServer, DiscordChannel, DiscordSettings, ConnectionStatus, DiscordCallbackOptions } from '../services/discordService';
 
@@ -56,7 +56,7 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(intervalId);
   }, []);
 
-  const getDiscordAuthUrl = async (): Promise<string> => {
+  const getDiscordAuthUrl = useCallback(async (): Promise<string> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -69,28 +69,9 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleDiscordCallback = async (code: string, options?: DiscordCallbackOptions): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const success = await discordService.handleCallback(code, options);
-      if (success) {
-        setIsAuthenticated(true);
-        await loadSettings();
-      }
-      return success;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to authenticate with Discord';
-      setError(message);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadServers = async (): Promise<void> => {
+  const loadServers = useCallback(async (): Promise<void> => {
     // Double-check authentication status before loading servers
     const authStatus = await discordService.getSettings();
     const isUserAuthenticated = authStatus.connected === true;
@@ -114,9 +95,9 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loadChannels = async (serverId: string): Promise<void> => {
+  const loadChannels = useCallback(async (serverId: string): Promise<void> => {
     // Double-check authentication status before loading channels
     const authStatus = await discordService.getSettings();
     const isUserAuthenticated = authStatus.connected === true;
@@ -140,9 +121,51 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loadSettings = async (): Promise<void> => {
+  const refreshConnectionStatus = useCallback(async (): Promise<void> => {
+    // Exit early if not authenticated
+    if (!isAuthenticated) {
+      // Don't try to refresh status if not authenticated
+      return;
+    }
+    
+    // Check if we've refreshed very recently (throttle)
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastStatusRefreshTime;
+    if (timeSinceLastRefresh < 2000) { // 2 second cooldown
+      console.log(`Skipping connection status refresh (throttled: ${timeSinceLastRefresh}ms since last refresh)`);
+      return;
+    }
+    
+    setLastStatusRefreshTime(now);
+    
+    try {
+      console.log('Refreshing Discord connection status...');
+      const status = await discordService.getConnectionStatus();
+      
+      // Only update state if connection status actually changed
+      if (JSON.stringify(status) !== JSON.stringify(connectionStatus)) {
+        console.log('Connection status changed, updating state:', status);
+        setConnectionStatus(status);
+        setIsConnected(status.isConnected);
+      } else {
+        console.log('Connection status unchanged, skipping state update');
+      }
+    } catch (err) {
+      console.error('Failed to refresh Discord connection status:', err);
+      // Don't set error state here to avoid constant errors in UI during polling
+      
+      // If we get a 401, the user is no longer authenticated
+      if (err instanceof Error && err.message.includes('401')) {
+        setIsAuthenticated(false);
+        setIsConnected(false);
+        setConnectionStatus(null);
+      }
+    }
+  }, [isAuthenticated, lastStatusRefreshTime, connectionStatus]);
+
+  const loadSettings = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -214,18 +237,37 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadChannels, loadServers, refreshConnectionStatus]);
 
-  const selectServer = (server: DiscordServer): void => {
+  const handleDiscordCallback = useCallback(async (code: string, options?: DiscordCallbackOptions): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const success = await discordService.handleCallback(code, options);
+      if (success) {
+        setIsAuthenticated(true);
+        await loadSettings();
+      }
+      return success;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to authenticate with Discord';
+      setError(message);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadSettings]);
+
+  const selectServer = useCallback((server: DiscordServer): void => {
     setCurrentServer(server);
     loadChannels(server.id);
-  };
+  }, [loadChannels]);
 
-  const selectChannel = (channel: DiscordChannel): void => {
+  const selectChannel = useCallback((channel: DiscordChannel): void => {
     setCurrentChannel(channel);
-  };
+  }, []);
 
-  const saveSettings = async (): Promise<boolean> => {
+  const saveSettings = useCallback(async (): Promise<boolean> => {
     if (!currentServer || !currentChannel) {
       setError('Server and channel must be selected');
       return false;
@@ -265,9 +307,9 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentServer, currentChannel, isAuthenticated, refreshConnectionStatus]);
 
-  const connect = async (): Promise<boolean> => {
+  const connect = useCallback(async (): Promise<boolean> => {
     // Prevent multiple connect attempts in rapid succession
     if (isLoading) {
       console.log('Connect operation already in progress, ignoring duplicate request');
@@ -302,9 +344,9 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isLoading, refreshConnectionStatus]);
 
-  const disconnect = async (): Promise<boolean> => {
+  const disconnect = useCallback(async (): Promise<boolean> => {
     // Prevent multiple disconnect attempts in rapid succession
     if (isLoading) {
       console.log('Disconnect operation already in progress, ignoring duplicate request');
@@ -341,51 +383,10 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isLoading, refreshConnectionStatus]);
 
-  const refreshConnectionStatus = async (): Promise<void> => {
-    // Exit early if not authenticated
-    if (!isAuthenticated) {
-      // Don't try to refresh status if not authenticated
-      return;
-    }
-    
-    // Check if we've refreshed very recently (throttle)
-    const now = Date.now();
-    const timeSinceLastRefresh = now - lastStatusRefreshTime;
-    if (timeSinceLastRefresh < 2000) { // 2 second cooldown
-      console.log(`Skipping connection status refresh (throttled: ${timeSinceLastRefresh}ms since last refresh)`);
-      return;
-    }
-    
-    setLastStatusRefreshTime(now);
-    
-    try {
-      console.log('Refreshing Discord connection status...');
-      const status = await discordService.getConnectionStatus();
-      
-      // Only update state if connection status actually changed
-      if (JSON.stringify(status) !== JSON.stringify(connectionStatus)) {
-        console.log('Connection status changed, updating state:', status);
-        setConnectionStatus(status);
-        setIsConnected(status.isConnected);
-      } else {
-        console.log('Connection status unchanged, skipping state update');
-      }
-    } catch (err) {
-      console.error('Failed to refresh Discord connection status:', err);
-      // Don't set error state here to avoid constant errors in UI during polling
-      
-      // If we get a 401, the user is no longer authenticated
-      if (err instanceof Error && err.message.includes('401')) {
-        setIsAuthenticated(false);
-        setIsConnected(false);
-        setConnectionStatus(null);
-      }
-    }
-  };
 
-  const streamSpeech = async (text: string, audioData?: string): Promise<boolean> => {
+  const streamSpeech = useCallback(async (text: string, audioData?: string): Promise<boolean> => {
     if (!isConnected) {
       return false;
     }
@@ -396,7 +397,7 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
       console.error('Failed to stream speech to Discord:', err);
       return false;
     }
-  };
+  }, [isConnected]);
 
   // Auto disconnect when app goes to background - moved after function declarations
   useEffect(() => {
@@ -424,7 +425,7 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [isConnected, discordSettings, disconnect, refreshConnectionStatus]);
 
-  const contextValue: DiscordContextType = {
+  const contextValue = useMemo<DiscordContextType>(() => ({
     isConnected,
     isLoading,
     isAuthenticated,
@@ -447,7 +448,30 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     disconnect,
     refreshConnectionStatus,
     streamSpeech
-  };
+  }), [
+    isConnected,
+    isLoading,
+    isAuthenticated,
+    connectionStatus,
+    discordSettings,
+    servers,
+    channels,
+    currentServer,
+    currentChannel,
+    error,
+    getDiscordAuthUrl,
+    handleDiscordCallback,
+    loadServers,
+    loadChannels,
+    loadSettings,
+    selectServer,
+    selectChannel,
+    saveSettings,
+    connect,
+    disconnect,
+    refreshConnectionStatus,
+    streamSpeech
+  ]);
 
   return (
     <DiscordContext.Provider value={contextValue}>

@@ -37,6 +37,20 @@ import {
   parseDiscordCallbackUrl,
 } from '../../services/discordOAuthRedirect';
 
+// discord-callback deep links already acted on (process-wide, survives re-mounts), so a
+// URL delivered twice (auth session result + Linking on Android, or a late duplicate) is
+// handled once. Cleared when a new auth session starts.
+const handledCallbackUrls = new Set<string>();
+// Linking.getInitialURL() returns the launch URL for the whole process life: consume it once.
+let initialUrlConsumed = false;
+
+/** Marks a discord-callback URL as handled; false if it already was. */
+function claimCallbackUrl(url: string): boolean {
+  if (handledCallbackUrls.has(url)) return false;
+  handledCallbackUrls.add(url);
+  return true;
+}
+
 const DiscordSettingsScreen: React.FC = () => {
   // Move all hooks to the top level of the component function
   const { t } = useTranslation();
@@ -93,8 +107,11 @@ const DiscordSettingsScreen: React.FC = () => {
   // Create refs outside of useEffect
   const wasConnectedRef = useRef(false);
   // True while openAuthSessionAsync owns the OAuth round-trip; the global deep-link
-  // listener then ignores the discord-callback URL so it is not handled twice.
+  // listener then only records the discord-callback URL (see pendingRedirectRef).
   const authSessionActiveRef = useRef(false);
+  // Redirect delivered through Linking during the auth session. On Android the session
+  // can resolve 'dismiss' although the redirect did arrive this way.
+  const pendingRedirectRef = useRef<string | null>(null);
   const styles = makeStyles(theme, isDarkMode);
 
   // Create stable versions of Discord context functions
@@ -125,7 +142,14 @@ const DiscordSettingsScreen: React.FC = () => {
   // (e.g. the app was restarted while the browser was open).
   const handleDeepLink = useCallback(async (event: { url: string }) => {
     const url = event.url;
-    if (!url.includes('discord-callback') || authSessionActiveRef.current) {
+    if (!url.includes('discord-callback')) {
+      return;
+    }
+    if (authSessionActiveRef.current) {
+      pendingRedirectRef.current = url;
+      return;
+    }
+    if (!claimCallbackUrl(url)) {
       return;
     }
     setAuthInProgress(false);
@@ -138,10 +162,7 @@ const DiscordSettingsScreen: React.FC = () => {
       return;
     }
     try {
-      const success = await handleDiscordCallback(params.code ?? '', {
-        tempKey: params.tempKey,
-        maxAttempts: 5,
-      });
+      const success = await handleDiscordCallback(params.code ?? '', { tempKey: params.tempKey });
       if (success) {
         Alert.alert(
           t('discord.authSuccess'),
@@ -164,20 +185,29 @@ const DiscordSettingsScreen: React.FC = () => {
     }
   }, [handleDiscordCallback, stableLoadSettings, t]);
 
-  // Handle deep link for Discord OAuth callback
-  useEffect(() => {
-    const subscription = Linking.addEventListener('url', handleDeepLink);
+  // Always call the latest handler without re-subscribing when its identity changes.
+  const handleDeepLinkRef = useRef(handleDeepLink);
+  handleDeepLinkRef.current = handleDeepLink;
 
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
+  // Handle deep link for Discord OAuth callback: subscribe once, consume the launch URL once.
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLinkRef.current(event);
     });
+
+    if (!initialUrlConsumed) {
+      initialUrlConsumed = true;
+      Linking.getInitialURL().then((url) => {
+        if (url) {
+          handleDeepLinkRef.current({ url });
+        }
+      });
+    }
 
     return () => {
       subscription.remove();
     };
-  }, [handleDeepLink]);
+  }, []);
 
   // Start Discord OAuth. Deliberately independent of `isAuthenticated`: it is also used to
   // re-authenticate an already linked account ("Refresh connection"), whose tokens the
@@ -193,30 +223,38 @@ const DiscordSettingsScreen: React.FC = () => {
       }
 
       console.log('Opening Discord auth session:', authUrl);
+      handledCallbackUrls.clear();
+      pendingRedirectRef.current = null;
       authSessionActiveRef.current = true;
       // Closes the in-app browser by itself when the callback page redirects to
       // DISCORD_OAUTH_REDIRECT_URL (see discordOAuthRedirect.ts for the contract).
       const result = await WebBrowser.openAuthSessionAsync(authUrl, DISCORD_OAUTH_REDIRECT_URL);
       console.log('Discord auth session result:', result.type);
 
+      // On Android the session may resolve 'dismiss' although the redirect arrived via Linking.
+      const redirectUrl = result.type === 'success' ? result.url : pendingRedirectRef.current;
+      authSessionActiveRef.current = false;
+      pendingRedirectRef.current = null;
+
       let success: boolean;
-      if (result.type === 'success') {
-        const params = parseDiscordCallbackUrl(result.url);
+      if (redirectUrl) {
+        claimCallbackUrl(redirectUrl); // a late duplicate delivery is then ignored
+        const params = parseDiscordCallbackUrl(redirectUrl);
         if (isDiscordCallbackError(params)) {
           success = false;
         } else {
-          // The backend confirmed the flow: claim what it handed back (or the pending
-          // temp key); its success is authoritative, so an existing link counts too.
+          // Claim exactly what the backend handed back. On re-auth an existing link is
+          // not proof that the new code was exchanged (requireFreshAuth).
           success = await handleDiscordCallback(params.code ?? '', {
             tempKey: params.tempKey,
-            maxAttempts: 5,
+            requireFreshAuth: reauth,
           });
         }
       } else {
-        // cancel / dismiss: the user closed the browser. Older callback pages never
-        // redirect, so the OAuth may still have completed: look for it briefly.
-        // On re-auth the old link still exists, so only a freshly claimed code counts.
-        success = await handleDiscordCallback('', { requireFreshAuth: reauth, maxAttempts: 3 });
+        // cancel / dismiss without redirect: the user closed the browser. An older callback
+        // page may still have linked the account through a web session: one check-auth
+        // (first connect only; on re-auth nothing here can prove fresh tokens).
+        success = reauth ? false : await handleDiscordCallback('', { requireFreshAuth: false });
         if (!success) {
           console.log('Discord auth session closed without completing OAuth');
           return false;
