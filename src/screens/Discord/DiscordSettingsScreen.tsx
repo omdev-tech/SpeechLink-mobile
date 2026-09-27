@@ -233,6 +233,43 @@ const DiscordSettingsScreen: React.FC = () => {
     }
   }, [isAuthenticated, getDiscordAuthUrl, handleDiscordCallback, stableLoadSettings]);
 
+  // loadSettings between disconnect and reconnect so handleConnectToDiscord sees
+  // isAuthenticated === false and takes the OAuth path instead of the no-op branch.
+  const handleRefreshConnection = useCallback(() => {
+    Alert.alert(
+      t('discord.refreshConfirmTitle'),
+      t('discord.refreshConfirmMessage'),
+      [
+        { text: t('general.cancel'), style: 'cancel' },
+        {
+          text: t('discord.refreshConfirmAction'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const disconnected = await stableDisconnect();
+              if (!disconnected) {
+                Alert.alert(
+                  t('general.error.title'),
+                  t('discord.refreshFailed')
+                );
+                return;
+              }
+
+              await stableLoadSettings();
+              await handleConnectToDiscord();
+            } catch (err) {
+              console.error('Error refreshing Discord connection:', err);
+              Alert.alert(
+                t('general.error.title'),
+                t('discord.refreshFailed')
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [stableDisconnect, stableLoadSettings, handleConnectToDiscord, t]);
+
   // Invite Discord Bot
   const handleInviteBot = useCallback(async () => {
     try {
@@ -887,6 +924,30 @@ const DiscordSettingsScreen: React.FC = () => {
               
               {/* Stage 3: Join/Leave Voice Channel */}
               {renderJoinButton()}
+
+              {isConnected && (
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={handleRefreshConnection}
+                  disabled={isLoading || authInProgress}
+                >
+                  {isLoading || authInProgress ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="refresh-outline"
+                        size={20}
+                        color="#fff"
+                        style={styles.buttonIcon}
+                      />
+                      <Text style={styles.refreshButtonText}>
+                        {t('discord.refreshConnection')}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </>
           )}
         </View>
@@ -1106,6 +1167,22 @@ const makeStyles = (theme: any, isDarkMode: boolean) => StyleSheet.create({
   },
   disconnectButton: {
     backgroundColor: '#ff3b30', // Red color for disconnect
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7289DA',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 8,
   },
   buttonIcon: {
     marginRight: 8,
