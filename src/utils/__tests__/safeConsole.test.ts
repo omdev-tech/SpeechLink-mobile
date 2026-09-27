@@ -66,4 +66,26 @@ describe('safeConsole', () => {
     c.log('hi');
     expect(original).toHaveBeenCalledTimes(1);
   });
+
+  it('does not mark shared (non-cyclic) references as [Circular]', () => {
+    const shared = { status: 'ok' };
+    const out = redactForLog({ a: shared, b: shared, list: [shared, shared] }) as any;
+    expect(out.b).toEqual({ status: 'ok' });
+    expect(out.list[1]).toEqual({ status: 'ok' });
+  });
+
+  it('summarises typed arrays and ArrayBuffers instead of dumping bytes', () => {
+    const out = redactForLog({ pcm: new Uint8Array(4096), buf: new ArrayBuffer(16), f: new Float32Array(3) }) as any;
+    expect(out.pcm).toBe('[Uint8Array 4096]');
+    expect(out.buf).toBe('[ArrayBuffer 16]');
+    expect(out.f).toBe('[Float32Array 3]');
+  });
+
+  it('truncates very long strings (after redaction)', () => {
+    const long = 'Bearer SECRETLONG ' + 'x'.repeat(20000);
+    const out = redactForLog(long) as string;
+    expect(out.length).toBeLessThan(10100);
+    expect(out).not.toContain('SECRETLONG');
+    expect(out).toMatch(/truncated/);
+  });
 });
