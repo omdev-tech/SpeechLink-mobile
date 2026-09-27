@@ -95,20 +95,32 @@ const ANDROID_PERMANENT_CAUSES = [
   /Could not find the encryption scheme/,
   /has an unknown encoding scheme/,
   /UnrecoverableKey/,
-  /KeyPermanentlyInvalidated/,
-  /AEADBadTag|BadPadding/,
   /InvalidKeyException/,
+  // (KeyPermanentlyInvalidated and BadPadding/AEADBadTag never reach JS: handled natively.)
   /entry for the keystore alias .* (is not a|couldn't be cast)/,
 ];
 
-export function isUnrecoverableSecureStoreError(error: unknown): boolean {
+/** Android DecryptException / KeyStoreException (any cause). */
+function isAndroidDecryptOrKeystoreError(error: unknown): boolean {
   if (Platform.OS !== 'android') return false;
   const message = String((error as any)?.message ?? error);
-  const isDecryptOrKeystore =
+  return (
     message.includes('Could not decrypt the value for key') ||
-    message.includes('An error occurred when accessing the keystore');
-  return isDecryptOrKeystore && ANDROID_PERMANENT_CAUSES.some((re) => re.test(message));
+    message.includes('An error occurred when accessing the keystore')
+  );
 }
+
+export function isUnrecoverableSecureStoreError(error: unknown): boolean {
+  const message = String((error as any)?.message ?? error);
+  return isAndroidDecryptOrKeystoreError(error) && ANDROID_PERMANENT_CAUSES.some((re) => re.test(message));
+}
+
+/**
+ * Keys whose last read failed with an Android decrypt/keystore error of unknown cause. We keep
+ * such an entry on read (it may be transient), but if a WRITE to it then fails too, the entry /
+ * alias is broken: we are overwriting it anyway, so reset it and retry the write once.
+ */
+const suspectKeys = new Set<string>();
 
 // ---------------------------------------------------------------------------------------------
 // Raw layout operations (callers hold the key's lock for writes/deletes).
@@ -165,6 +177,7 @@ async function sweepLegacyChunks(key: string, manifest: Manifest | null): Promis
 }
 
 async function resetKey(key: string): Promise<void> {
+  suspectKeys.delete(key);
   const manifest = await readManifestSafe(key);
   await deleteQuietly(manifestKey(key));
   await deleteQuietly(key);
@@ -181,7 +194,10 @@ async function readRaw(key: string): Promise<ReadResult> {
   try {
     for (let attempt = 0; ; attempt++) {
       const value = await readOnce(key);
-      if (value !== undefined) return { value, status: 'ok' };
+      if (value !== undefined) {
+        suspectKeys.delete(key);
+        return { value, status: 'ok' };
+      }
       if (attempt >= RETRY_BACKOFF_MS.length) return { value: null, status: 'unavailable' };
       await sleep(RETRY_BACKOFF_MS[attempt]); // safety net; the lock should make this rare
     }
@@ -193,6 +209,7 @@ async function readRaw(key: string): Promise<ReadResult> {
       await withLock(key, () => resetKey(key));
       return { value: null, status: 'reset' };
     }
+    if (isAndroidDecryptOrKeystoreError(error)) suspectKeys.add(key);
     console.warn('[secureStorage] read failed (transient), keeping the entry', error?.message);
     return { value: null, status: 'unavailable' };
   }
@@ -292,9 +309,21 @@ async function read(key: string): Promise<string | null> {
   return null;
 }
 
+async function writeRecovering(key: string, value: string): Promise<void> {
+  try {
+    await writeRaw(key, value);
+  } catch (error: any) {
+    if (!suspectKeys.has(key)) throw error;
+    console.warn('[secureStorage] write failed on an unreadable entry; resetting it and retrying', error?.message);
+    await resetKey(key);
+    await writeRaw(key, value);
+  }
+  suspectKeys.delete(key);
+}
+
 async function write(key: string, value: string): Promise<void> {
   await migrateLegacyTokens();
-  await withLock(key, () => writeRaw(key, value));
+  await withLock(key, () => writeRecovering(key, value));
   if (!isWeb()) await AsyncStorage.removeItem(key); // never leave a plaintext twin behind
 }
 
@@ -315,6 +344,7 @@ export async function clearTokens(): Promise<void> {
 
 /** Test-only: forget that the migration already ran. */
 export function __resetMigrationForTests(): void {
+  suspectKeys.clear();
   migration = null;
   migrationFailed = false;
 }
