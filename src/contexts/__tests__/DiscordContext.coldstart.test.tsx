@@ -62,7 +62,7 @@ describe('DiscordProvider - cold-start discord-callback link (app level, no Disc
   });
 
   it('error launch URL: failure alert, nothing claimed', async () => {
-    initialUrl.mockResolvedValue(`${REDIRECT}?status=error&error=access_denied`);
+    initialUrl.mockResolvedValue(`${REDIRECT}?status=error&error=exchange_failed`);
     render(<DiscordProvider>{null}</DiscordProvider>);
     await waitFor(() => expect(alertTitles()).toEqual(['discord.authFailed']));
     expect(service.handleCallback).not.toHaveBeenCalled();
@@ -76,4 +76,20 @@ describe('DiscordProvider - cold-start discord-callback link (app level, no Disc
     expect(service.handleCallback).not.toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
   });
+
+  it('pending handoff launch URL (process died, verifier lost) -> no completion, "please reconnect"', async () => {
+    initialUrl.mockResolvedValue(`${REDIRECT}?status=pending&handoff=${'h'.repeat(43)}`);
+    (service as any).completeHandoff = jest.fn();
+    render(<DiscordProvider>{null}</DiscordProvider>);
+    await waitFor(() => expect(alertSpy.mock.calls.map((c) => [c[0], c[1]])).toEqual([['discord.authFailed', 'discord.reconnectNeeded']]));
+    expect((service as any).completeHandoff).not.toHaveBeenCalled();
+    expect(service.handleCallback).not.toHaveBeenCalled();
+  });
+
+  it('access_denied launch URL -> gentle "cancelled"', async () => {
+    initialUrl.mockResolvedValue(`${REDIRECT}?status=error&error=access_denied`);
+    render(<DiscordProvider>{null}</DiscordProvider>);
+    await waitFor(() => expect(alertSpy.mock.calls.map((c) => c[0])).toEqual(['discord.authCancelled']));
+  });
 });
+

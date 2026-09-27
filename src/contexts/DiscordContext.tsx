@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { Alert, AppState, AppStateStatus } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { discordService, DiscordServer, DiscordChannel, DiscordSettings, ConnectionStatus, DiscordCallbackOptions } from '../services/discordService';
+import { discordService, DiscordServer, DiscordChannel, DiscordSettings, ConnectionStatus, DiscordCallbackOptions, DiscordHandoffResult } from '../services/discordService';
+import { discordAuthFailureKeys } from '../services/discordAuthMessages';
 import { consumeInitialDiscordCallbackUrl } from '../services/discordCallbackLinks';
 import { isDiscordCallbackError, parseDiscordCallbackUrl } from '../services/discordOAuthRedirect';
 
@@ -16,8 +17,10 @@ interface DiscordContextType {
   currentServer: DiscordServer | null;
   currentChannel: DiscordChannel | null;
   error: string | null;
-  getDiscordAuthUrl: () => Promise<string>;
+  getDiscordAuthUrl: (codeChallenge?: string) => Promise<string>;
   handleDiscordCallback: (code: string, options?: DiscordCallbackOptions) => Promise<boolean>;
+  /** PKCE handoff completion; on success marks the account linked and reloads settings. */
+  completeDiscordHandoff: (handoff: string, verifier: string) => Promise<DiscordHandoffResult>;
   loadServers: () => Promise<void>;
   loadChannels: (serverId: string) => Promise<void>;
   loadSettings: () => Promise<void>;
@@ -60,11 +63,11 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(intervalId);
   }, []);
 
-  const getDiscordAuthUrl = useCallback(async (): Promise<string> => {
+  const getDiscordAuthUrl = useCallback(async (codeChallenge?: string): Promise<string> => {
     setIsLoading(true);
     setError(null);
     try {
-      const url = await discordService.getAuthUrl();
+      const url = await discordService.getAuthUrl(codeChallenge);
       return url;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to get Discord auth URL';
@@ -262,6 +265,21 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [loadSettings]);
 
+  const completeDiscordHandoff = useCallback(async (handoff: string, verifier: string): Promise<DiscordHandoffResult> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await discordService.completeHandoff(handoff, verifier);
+      if (result.success) {
+        setIsAuthenticated(true);
+        await loadSettings();
+      }
+      return result;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadSettings]);
+
   const selectServer = useCallback((server: DiscordServer): void => {
     setCurrentServer(server);
     loadChannels(server.id);
@@ -439,7 +457,15 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
         if (!url) return;
         const params = parseDiscordCallbackUrl(url);
         if (isDiscordCallbackError(params)) {
-          Alert.alert(t('discord.authFailed'), t('discord.authFailedMessage'));
+          const [title, message] = discordAuthFailureKeys(params.error);
+          Alert.alert(t(title), t(message));
+          return;
+        }
+        if (params.pending) {
+          // A fresh process cannot hold the PKCE verifier of the flow that produced this
+          // handoff (memory only): it cannot be completed, the user has to reconnect.
+          const [title, message] = discordAuthFailureKeys('reconnect_needed');
+          Alert.alert(t(title), t(message));
           return;
         }
         if (!params.code && !params.tempKey && params.status !== 'success') return;
@@ -469,6 +495,7 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     error,
     getDiscordAuthUrl,
     handleDiscordCallback,
+    completeDiscordHandoff,
     loadServers,
     loadChannels,
     loadSettings,
@@ -492,6 +519,7 @@ export const DiscordProvider = ({ children }: { children: ReactNode }) => {
     error,
     getDiscordAuthUrl,
     handleDiscordCallback,
+    completeDiscordHandoff,
     loadServers,
     loadChannels,
     loadSettings,

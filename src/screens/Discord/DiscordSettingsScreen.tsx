@@ -37,6 +37,12 @@ import {
   parseDiscordCallbackUrl,
 } from '../../services/discordOAuthRedirect';
 import { claimCallbackUrl, clearHandledCallbackUrls } from '../../services/discordCallbackLinks';
+import { createPkcePair } from '../../services/discordPkce';
+import { discordAuthFailureKeys } from '../../services/discordAuthMessages';
+import { toDiscordApiError } from '../../services/discordService';
+
+// Server-side lifetime of a Discord connect handoff: later pending links cannot complete.
+const HANDOFF_TTL_MS = 10 * 60 * 1000;
 
 const DiscordSettingsScreen: React.FC = () => {
   // Move all hooks to the top level of the component function
@@ -61,6 +67,7 @@ const DiscordSettingsScreen: React.FC = () => {
     error,
     getDiscordAuthUrl,
     handleDiscordCallback,
+    completeDiscordHandoff,
     loadServers,
     loadChannels,
     loadSettings,
@@ -99,6 +106,16 @@ const DiscordSettingsScreen: React.FC = () => {
   // Redirect delivered through Linking during the auth session. On Android the session
   // can resolve 'dismiss' although the redirect did arrive this way.
   const pendingRedirectRef = useRef<string | null>(null);
+  // PKCE verifier of the Discord connect flow THIS screen instance started, and when it
+  // started. Memory only (never persisted or logged). Cleared once the handoff completes or
+  // its code was spent (exchange_failed), when the flow is over without a pending link,
+  // after the server's 10-minute handoff TTL, and on unmount. Kept after a cancel/dismiss
+  // (a late pending link of this flow can still arrive) and after a rejected foreign or
+  // malformed handoff (an injected link must not burn the real one).
+  const pkceVerifierRef = useRef<{ verifier: string; startedAt: number } | null>(null);
+  useEffect(() => () => {
+    pkceVerifierRef.current = null;
+  }, []);
   const styles = makeStyles(theme, isDarkMode);
 
   // Create stable versions of Discord context functions
@@ -125,8 +142,41 @@ const DiscordSettingsScreen: React.FC = () => {
   // Load settings once when the screen is focused
   // REMOVING THIS useFocusEffect BLOCK
   
+  // Completes a PKCE handoff with this flow's verifier (consumed whatever the outcome).
+  // Without a verifier (flow not started by this app instance) nothing is sent.
+  const completeHandoff = useCallback(async (handoff: string | undefined) => {
+    const flow = pkceVerifierRef.current;
+    if (flow && Date.now() - flow.startedAt > HANDOFF_TTL_MS) {
+      pkceVerifierRef.current = null; // the server has expired this flow's handoff anyway
+      console.log('Ignoring Discord handoff: connect flow older than the handoff TTL');
+      return { success: false, code: 'reconnect_needed' };
+    }
+    if (!flow) {
+      console.log('Ignoring Discord handoff: no connect flow in progress in this app instance');
+      return { success: false, code: 'reconnect_needed' };
+    }
+    if (!handoff) {
+      return { success: false, code: 'invalid_handoff' };
+    }
+    const result = await completeDiscordHandoff(handoff, flow.verifier);
+    if (result.success || result.code === 'exchange_failed') {
+      // Used up. Other failures (invalid_handoff: a foreign/injected link, transient errors)
+      // keep it for the genuine link of this flow.
+      if (pkceVerifierRef.current === flow) pkceVerifierRef.current = null;
+    }
+    return result;
+  }, [completeDiscordHandoff]);
+
+  const alertAuthFailure = useCallback((code: string | undefined, reauth = false) => {
+    let [title, message] = discordAuthFailureKeys(code);
+    if (reauth && message === 'discord.authFailedMessage') {
+      message = 'discord.refreshFailed';
+    }
+    Alert.alert(t(title), t(message));
+  }, [t]);
+
   // Deep link back from the OAuth callback page when it arrives outside an auth session
-  // (e.g. the app was restarted while the browser was open).
+  // (e.g. it was delivered after the session resolved cancel/dismiss).
   const handleDeepLink = useCallback(async (event: { url: string }) => {
     const url = event.url;
     if (!url.includes('discord-callback')) {
@@ -142,7 +192,17 @@ const DiscordSettingsScreen: React.FC = () => {
     setAuthInProgress(false);
     const params = parseDiscordCallbackUrl(url);
     if (isDiscordCallbackError(params)) {
-      Alert.alert(t('discord.authFailed'), t('discord.authFailedMessage'));
+      alertAuthFailure(params.error);
+      return;
+    }
+    if (params.pending) {
+      const result = await completeHandoff(params.handoff);
+      if (result.success) {
+        // completeDiscordHandoff reloaded the settings.
+        Alert.alert(t('discord.authSuccess'), t('discord.authSuccessMessage'));
+      } else {
+        alertAuthFailure(result.code);
+      }
       return;
     }
     if (!params.code && !params.tempKey && params.status !== 'success') {
@@ -161,19 +221,13 @@ const DiscordSettingsScreen: React.FC = () => {
         // Reload settings after successful authentication
         await stableLoadSettings();
       } else {
-        Alert.alert(
-          t('discord.authFailed'),
-          t('discord.authFailedMessage')
-        );
+        alertAuthFailure(undefined);
       }
     } catch (err) {
       console.error('Error handling Discord callback:', err);
-      Alert.alert(
-        t('discord.authFailed'),
-        t('discord.authFailedMessage')
-      );
+      alertAuthFailure(undefined);
     }
-  }, [handleDiscordCallback, stableLoadSettings, t]);
+  }, [handleDiscordCallback, completeHandoff, alertAuthFailure, stableLoadSettings, t]);
 
   // Always call the latest handler without re-subscribing when its identity changes.
   const handleDeepLinkRef = useRef(handleDeepLink);
@@ -198,8 +252,11 @@ const DiscordSettingsScreen: React.FC = () => {
   const startDiscordOAuth = useCallback(async ({ reauth }: { reauth: boolean }) => {
     setAuthInProgress(true);
     try {
-      // Get auth URL from backend
-      const authUrl = await getDiscordAuthUrl();
+      // PKCE: only the S256 challenge goes out now; the verifier stays in memory until the
+      // pending handoff is completed.
+      const { verifier, challenge } = await createPkcePair();
+      pkceVerifierRef.current = { verifier, startedAt: Date.now() };
+      const authUrl = await getDiscordAuthUrl(challenge);
       if (!authUrl) {
         throw new Error('Failed to get Discord authorization URL');
       }
@@ -219,12 +276,22 @@ const DiscordSettingsScreen: React.FC = () => {
       pendingRedirectRef.current = null;
 
       let success: boolean;
+      let failureCode: string | undefined;
       if (redirectUrl) {
         claimCallbackUrl(redirectUrl); // a late duplicate delivery is then ignored
         const params = parseDiscordCallbackUrl(redirectUrl);
         if (isDiscordCallbackError(params)) {
+          pkceVerifierRef.current = null;
           success = false;
+          failureCode = params.error;
+        } else if (params.pending) {
+          // Current backend: complete the handoff with this flow's verifier. A completed
+          // handoff is a fresh link by construction, also for a re-auth.
+          const result = await completeHandoff(params.handoff);
+          success = result.success;
+          failureCode = result.code;
         } else {
+          pkceVerifierRef.current = null;
           // Claim exactly what the backend handed back. linked=1 is a confirmed fresh link;
           // otherwise, on re-auth an existing link is not proof that the new code was
           // exchanged (requireFreshAuth).
@@ -251,24 +318,29 @@ const DiscordSettingsScreen: React.FC = () => {
           t('discord.authSuccessMessage')
         );
       } else {
-        Alert.alert(
-          t('discord.authFailed'),
-          reauth ? t('discord.refreshFailed') : t('discord.authFailedMessage')
-        );
+        alertAuthFailure(failureCode, reauth);
       }
       return success;
     } catch (err) {
       console.error('Error during Discord authentication:', err);
-      Alert.alert(
-        t('general.error.title'),
-        t('discord.authError', 'Failed to connect to Discord. Please try again.')
-      );
+      if (!authSessionActiveRef.current) {
+        // Failed before the browser opened: this flow's verifier will never be used.
+        pkceVerifierRef.current = null;
+      }
+      if (toDiscordApiError(err).code === 'rate_limited') {
+        alertAuthFailure('rate_limited');
+      } else {
+        Alert.alert(
+          t('general.error.title'),
+          t('discord.authError', 'Failed to connect to Discord. Please try again.')
+        );
+      }
       return false;
     } finally {
       authSessionActiveRef.current = false;
       setAuthInProgress(false);
     }
-  }, [getDiscordAuthUrl, handleDiscordCallback, t]);
+  }, [getDiscordAuthUrl, handleDiscordCallback, completeHandoff, alertAuthFailure, t]);
 
   // Connect Discord Account
   const handleConnectToDiscord = useCallback(async () => {

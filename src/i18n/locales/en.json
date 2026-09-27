@@ -143,7 +143,13 @@
     "refreshConfirmTitle": "Refresh Discord connection",
     "refreshConfirmMessage": "You will be asked to sign in to Discord again to renew SpeechLink's access. Your server and channel selection is kept. Continue?",
     "refreshConfirmAction": "Refresh",
-    "refreshFailed": "Failed to refresh Discord connection. Please try again."
+    "refreshFailed": "Failed to refresh Discord connection. Please try again.",
+    "authCancelled": "Discord connection cancelled",
+    "authCancelledMessage": "You cancelled the Discord authorization. You can connect again whenever you like.",
+    "rateLimited": "Too many attempts. Please try again in a minute.",
+    "authRetry": "Discord could not complete the connection. Please try again.",
+    "reconnectNeeded": "This Discord connection can no longer be completed. Please connect again from the Discord settings.",
+    "temporarilyUnavailable": "SpeechLink is being updated. Please try again in a minute."
   },
   "home": {
     "title": "Voice Enhancer",

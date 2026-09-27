@@ -17,6 +17,7 @@ export const mockDiscord = {
   error: null as string | null,
   getDiscordAuthUrl: jest.fn(),
   handleDiscordCallback: jest.fn(),
+  completeDiscordHandoff: jest.fn(),
   loadServers: jest.fn(),
   loadChannels: jest.fn(),
   loadSettings: jest.fn(),
@@ -69,6 +70,13 @@ jest.mock('expo-web-browser', () => ({
   dismissBrowser: jest.fn(),
 }));
 
+/** Deterministic PKCE pair for screen tests (real generation is covered in discordPkce tests). */
+export const TEST_VERIFIER = 'v'.repeat(43);
+export const TEST_CHALLENGE = 'c'.repeat(43);
+jest.mock('../services/discordPkce', () => ({
+  createPkcePair: jest.fn(async () => ({ verifier: 'v'.repeat(43), challenge: 'c'.repeat(43) })),
+}));
+
 export const AUTH_URL = 'https://discord.com/api/oauth2/authorize?client_id=x';
 
 /** Resets the context mock to a linked-or-not account with sane async defaults. */
@@ -87,6 +95,7 @@ export function resetDiscordMock(overrides: Partial<typeof mockDiscord> = {}) {
   }
   mockDiscord.getDiscordAuthUrl.mockResolvedValue(AUTH_URL);
   mockDiscord.handleDiscordCallback.mockResolvedValue(true);
+  mockDiscord.completeDiscordHandoff.mockResolvedValue({ success: true });
   mockDiscord.loadSettings.mockResolvedValue(undefined);
   mockDiscord.disconnect.mockResolvedValue(true);
   Object.assign(mockDiscord, overrides);
