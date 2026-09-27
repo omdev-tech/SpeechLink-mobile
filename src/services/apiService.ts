@@ -1,4 +1,5 @@
 import { authService, AuthToken } from './authService';
+import { SecureStorageUnavailableError } from './secureStorage';
 import { API_CONFIG } from '../config/api';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -113,6 +114,11 @@ class ApiService {
             throw new Error('Authentication failed - please log in again');
           }
         } catch (refreshError) {
+          if (refreshError instanceof SecureStorageUnavailableError) {
+            // Token unreadable right now (keychain locked) — don't log the user out.
+            this.authFailureHandled = false;
+            throw refreshError;
+          }
           console.error('[Auth] Token refresh error:', refreshError);
           // Ensure logout is triggered
           authService.triggerAuthFailedCallbacks();

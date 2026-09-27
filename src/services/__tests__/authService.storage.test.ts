@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { __resetMigrationForTests } from '../secureStorage';
+import { __resetMigrationForTests, SecureStorageUnavailableError } from '../secureStorage';
 
 const secure = (SecureStore as any).__store as Map<string, string>;
 
@@ -40,5 +40,25 @@ describe('authService token persistence', () => {
     await authService.clearToken();
     expect(secure.size).toBe(0);
     expect(await freshAuthService().getToken()).toBeNull();
+  });
+
+  it('a failed (locked keychain) read never clears the session', async () => {
+    const authService = freshAuthService();
+    await authService.saveToken({ access_token: 'tok-3' });
+    (singleton as any).token = null; // cold start
+    const getMock = SecureStore.getItemAsync as jest.Mock;
+    getMock.mockRejectedValueOnce(new Error('User interaction is not allowed.'));
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const failed = jest.fn();
+    authService.onAuthenticationFailed(failed);
+
+    // "unknown" is surfaced as an error, not as a failed refresh (which would log out)
+    await expect(authService.refreshAccessToken()).rejects.toBeInstanceOf(SecureStorageUnavailableError);
+    expect(failed).not.toHaveBeenCalled();
+    expect(secure.get('auth_token')).toBe('tok-3');
+    expect((await authService.getToken())?.access_token).toBe('tok-3');
+    errSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 });

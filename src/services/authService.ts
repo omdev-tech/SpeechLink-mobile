@@ -181,6 +181,11 @@ class AuthService {
         console.log('[Auth] Token refresh successful');
         return true;
       } catch (error) {
+        if (error instanceof secureStorage.SecureStorageUnavailableError) {
+          // Couldn't READ the token (e.g. keychain locked) — not a rejected session. Keep it.
+          console.warn('[Auth] Token refresh skipped: secure storage temporarily unavailable');
+          throw error;
+        }
         console.error('[Auth] Token refresh failed:', error);
         // If refresh fails, log the user out
         await this.clearToken();
@@ -268,6 +273,8 @@ class AuthService {
         return this.token;
       }
     } catch (error) {
+      // "Unknown" (keychain locked...) must not look like "logged out" to callers.
+      if (error instanceof secureStorage.SecureStorageUnavailableError) throw error;
       console.error('Error retrieving stored token:', error);
     }
 

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import {
   getToken,
   setToken,
@@ -8,6 +9,7 @@ import {
   clearTokens,
   migrateLegacyTokens,
   __resetMigrationForTests,
+  SecureStorageUnavailableError,
 } from '../secureStorage';
 
 const secure = (SecureStore as any).__store as Map<string, string>;
@@ -106,25 +108,47 @@ describe('secureStorage', () => {
     });
   });
 
-  describe('undecryptable Android keystore entries (OS update / backup restore)', () => {
-    // Simulates the Keystore key being gone: reads of these keys throw until they are deleted.
-    const corrupt = new Set<string>();
+  describe('SecureStore read errors', () => {
+    // Keys in `failing` throw the given native message on read (until deleted, if `sticky`).
+    const failing = new Map<string, { message: string; times: number }>();
     const getMock = SecureStore.getItemAsync as jest.Mock;
     const delMock = SecureStore.deleteItemAsync as jest.Mock;
     let origGet: any;
     let origDel: any;
     let warn: jest.SpyInstance;
+    let restoreOS: () => void;
+
+    // Exact messages from expo-secure-store 15.0.8 native code.
+    const ANDROID_DECRYPT =
+      "Calling the 'getValueWithKeyAsync' function has failed\n→ Caused by: Could not decrypt the value for key 'auth_token' under keychain 'key_v1'. Caused by: Could not parse the encrypted JSON item in SecureStore: Unterminated object";
+    const ANDROID_UNRECOVERABLE =
+      "Could not decrypt the value for key 'auth_token' under keychain 'key_v1'. Caused by: android.security.keystore.UnrecoverableKeyException: Failed to obtain information about key";
+    const ANDROID_TRANSIENT =
+      "Could not decrypt the value for key 'auth_token' under keychain 'key_v1'. Caused by: Keystore operation failed";
+    const IOS_LOCKED = "Calling the 'getValueWithKeyAsync' function has failed\n→ Caused by: User interaction is not allowed.";
+
+    const setOS = (os: string) => {
+      const desc = Object.getOwnPropertyDescriptor(Platform, 'OS')!;
+      Object.defineProperty(Platform, 'OS', { configurable: true, get: () => os });
+      restoreOS = () => Object.defineProperty(Platform, 'OS', desc);
+    };
+    const fail = (key: string, message: string, times = Infinity) => failing.set(key, { message, times });
 
     beforeEach(() => {
-      corrupt.clear();
+      failing.clear();
+      restoreOS = () => {};
       origGet = getMock.getMockImplementation();
       origDel = delMock.getMockImplementation();
       getMock.mockImplementation(async (key: string) => {
-        if (corrupt.has(key)) throw new Error('Could not decrypt the value for key');
+        const f = failing.get(key);
+        if (f && f.times > 0) {
+          f.times -= 1;
+          throw new Error(f.message);
+        }
         return origGet(key);
       });
       delMock.mockImplementation(async (key: string) => {
-        corrupt.delete(key);
+        failing.delete(key);
         return origDel(key);
       });
       warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -133,28 +157,70 @@ describe('secureStorage', () => {
       getMock.mockImplementation(origGet);
       delMock.mockImplementation(origDel);
       warn.mockRestore();
+      restoreOS();
     });
 
-    it('an unreadable entry does not throw: it is deleted and the legacy copy is used', async () => {
-      secure.set('auth_token', 'garbage');
-      corrupt.add('auth_token');
-      await AsyncStorage.setItem('auth_token', 'legacy-access');
-      await expect(getToken()).resolves.toBe('legacy-access');
+    describe('Android: genuinely undecryptable entry (Keystore key lost)', () => {
+      beforeEach(() => setOS('android'));
+
+      it('is deleted and the legacy copy is used', async () => {
+        secure.set('auth_token', 'garbage');
+        fail('auth_token', ANDROID_DECRYPT);
+        await AsyncStorage.setItem('auth_token', 'legacy-access');
+        await expect(getToken()).resolves.toBe('legacy-access');
+      });
+
+      it('with no legacy copy reads as logged-out, and a new login persists', async () => {
+        secure.set('auth_token', 'garbage');
+        fail('auth_token', ANDROID_UNRECOVERABLE);
+        await expect(getToken()).resolves.toBeNull();
+        expect(secure.has('auth_token')).toBe(false);
+        await setToken('new-login');
+        await expect(getToken()).resolves.toBe('new-login');
+      });
+
+      it('an unreadable chunk-count key does not block writing a new token', async () => {
+        secure.set('auth_token.chunks', '3');
+        fail('auth_token.chunks', ANDROID_DECRYPT);
+        await setToken('new-login');
+        await expect(getToken()).resolves.toBe('new-login');
+      });
+
+      it('a transient Keystore failure does NOT delete the token', async () => {
+        await setToken('good-token');
+        fail('auth_token', ANDROID_TRANSIENT, 1);
+        await expect(getToken()).rejects.toBeInstanceOf(SecureStorageUnavailableError);
+        expect(secure.get('auth_token')).toBe('good-token');
+        await expect(getToken()).resolves.toBe('good-token');
+      });
     });
 
-    it('an unreadable entry with no legacy copy reads as logged-out, and a new login persists', async () => {
-      secure.set('auth_token', 'garbage');
-      corrupt.add('auth_token');
-      await expect(getToken()).resolves.toBeNull();
-      await setToken('new-login');
-      await expect(getToken()).resolves.toBe('new-login');
-    });
+    describe('iOS: keychain locked (errSecInteractionNotAllowed)', () => {
+      beforeEach(() => setOS('ios'));
 
-    it('an unreadable chunk-count key does not block writing a new token', async () => {
-      secure.set('auth_token.chunks', '3');
-      corrupt.add('auth_token.chunks');
-      await setToken('new-login');
-      await expect(getToken()).resolves.toBe('new-login');
+      it('keeps the token; the read reports "unknown" (not logged out) and the next read returns it', async () => {
+        await setToken('good-token');
+        fail('auth_token', IOS_LOCKED, 1);
+        await expect(getToken()).rejects.toBeInstanceOf(SecureStorageUnavailableError);
+        expect(secure.get('auth_token')).toBe('good-token');
+        await expect(getToken()).resolves.toBe('good-token');
+      });
+
+      it('even a "decrypt"-looking message never deletes on iOS', async () => {
+        await setToken('good-token');
+        fail('auth_token', ANDROID_DECRYPT, 1);
+        await expect(getToken()).rejects.toBeInstanceOf(SecureStorageUnavailableError);
+        await expect(getToken()).resolves.toBe('good-token');
+      });
+
+      it('a locked keychain during migration does not overwrite the SecureStore token with the legacy one', async () => {
+        await setToken('fresh');
+        await AsyncStorage.setItem('auth_token', 'stale');
+        __resetMigrationForTests();
+        fail('auth_token', IOS_LOCKED, 1);
+        await migrateLegacyTokens();
+        expect(secure.get('auth_token')).toBe('fresh');
+      });
     });
   });
 
@@ -192,6 +258,74 @@ describe('secureStorage', () => {
       seen.add(await getToken());
       for (const v of seen) expect([from, to]).toContain(v);
       expect(await getToken()).toBe(to);
+    });
+  });
+
+  describe('chunk slots: bounded, no orphans', () => {
+    const BIG = (c: string) => c.repeat(4000);
+    const chunkKeys = () => [...secure.keys()].filter((k) => /^auth_token\.(a|b|\d)/.test(k));
+
+    it('uses only the two fixed slots a/b', async () => {
+      await setToken(BIG('A'));
+      await setToken(BIG('B'));
+      await setToken(BIG('C'));
+      const slots = new Set(chunkKeys().map((k) => k.split('.')[1]));
+      expect([...slots].every((s) => s === 'a' || s === 'b')).toBe(true);
+      expect(slots.size).toBe(1); // previous slot cleaned after each write
+      expect(await getToken()).toBe(BIG('C'));
+    });
+
+    it('concurrent setToken(B)/setToken(C) then clearTokens leaves zero chunk keys', async () => {
+      await setToken(BIG('A'));
+      await Promise.all([setToken(BIG('B')), setToken(BIG('C'))]);
+      expect(await getToken()).toBe(BIG('C')); // writes are serialised in call order
+      await clearTokens();
+      expect([...secure.keys()]).toEqual([]);
+    });
+
+    it('a crash mid-write leaves at most one stale slot; the old token stays readable; next clear removes it', async () => {
+      await setToken(BIG('A'));
+      const setMock = SecureStore.setItemAsync as jest.Mock;
+      const orig = setMock.getMockImplementation();
+      let calls = 0;
+      setMock.mockImplementation(async (k: string, v: string) => {
+        calls += 1;
+        if (calls === 2) throw new Error('process killed');
+        return orig!(k, v);
+      });
+      await expect(setToken(BIG('B'))).rejects.toThrow('process killed');
+      setMock.mockImplementation(orig);
+
+      expect(await getToken()).toBe(BIG('A'));
+      const slots = new Set(chunkKeys().map((k) => k.split('.')[1]));
+      expect(slots.size).toBeLessThanOrEqual(2); // live slot + at most one stale slot
+      await clearTokens();
+      expect([...secure.keys()]).toEqual([]);
+    });
+
+    it('a crash mid-write is cleaned up by the next write', async () => {
+      await setToken(BIG('A'));
+      const setMock = SecureStore.setItemAsync as jest.Mock;
+      const orig = setMock.getMockImplementation();
+      let calls = 0;
+      setMock.mockImplementation(async (k: string, v: string) => {
+        calls += 1;
+        if (calls === 2) throw new Error('process killed');
+        return orig!(k, v);
+      });
+      await expect(setToken(BIG('B'))).rejects.toThrow();
+      setMock.mockImplementation(orig);
+      await setToken('small');
+      expect([...secure.keys()]).toEqual(['auth_token']);
+    });
+
+    it('still reads the legacy plain-count chunk layout', async () => {
+      secure.set('auth_token.chunks', '2');
+      secure.set('auth_token.0', 'left-');
+      secure.set('auth_token.1', 'right');
+      expect(await getToken()).toBe('left-right');
+      await clearTokens();
+      expect([...secure.keys()]).toEqual([]);
     });
   });
 });
