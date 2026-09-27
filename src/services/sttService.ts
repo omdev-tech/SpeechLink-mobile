@@ -1,5 +1,5 @@
 import { apiService } from './apiService';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export interface STTRequest {
   audio: string; // Base64 encoded audio

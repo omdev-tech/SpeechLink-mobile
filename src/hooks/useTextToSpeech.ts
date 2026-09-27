@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Alert, Platform, NativeEventEmitter, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { ttsService, TTSRequest } from '../services/ttsService';
 import { apiService } from '../services/apiService';
 import { authService } from '../services/authService';
