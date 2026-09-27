@@ -195,6 +195,40 @@ describe('secureStorage', () => {
       });
     });
 
+    describe('Android: broken keystore alias with an unrecognised cause', () => {
+      beforeEach(() => setOS('android'));
+      // Real format; the cause is the platform message only (no exception class name).
+      const UNKNOWN_CAUSE =
+        "Could not decrypt the value for key 'auth_token' under keychain 'key_v1'. Caused by: Unknown error";
+
+      it('a failed write after such a read resets the key and retries the write once', async () => {
+        secure.set('auth_token', 'garbage');
+        fail('auth_token', UNKNOWN_CAUSE);
+        await expect(getToken()).rejects.toBeInstanceOf(SecureStorageUnavailableError); // kept: cause unknown
+        expect(secure.has('auth_token')).toBe(true);
+
+        const setMock = SecureStore.setItemAsync as jest.Mock;
+        const origSet = setMock.getMockImplementation();
+        // The native write fails while the broken entry/alias exists; works after a delete.
+        setMock.mockImplementation(async (k: string, v: string) => {
+          if (failing.has(k)) throw new Error(`Could not encrypt the value for key '${k}' under keychain 'key_v1'. Caused by: Unknown error`);
+          return origSet!(k, v);
+        });
+        try {
+          await setToken('new-login');
+        } finally {
+          setMock.mockImplementation(origSet);
+        }
+        await expect(getToken()).resolves.toBe('new-login');
+      });
+
+      it('without a prior failed read, a failed write is not retried (no blind deletes)', async () => {
+        const setMock = SecureStore.setItemAsync as jest.Mock;
+        setMock.mockRejectedValueOnce(new Error('disk full'));
+        await expect(setToken('x')).rejects.toThrow('disk full');
+      });
+    });
+
     describe('iOS: keychain locked (errSecInteractionNotAllowed)', () => {
       beforeEach(() => setOS('ios'));
 

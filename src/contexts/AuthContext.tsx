@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../services/authService';
 import { SecureStorageUnavailableError } from '../services/secureStorage';
@@ -42,29 +43,71 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   }, []);
 
   useEffect(() => {
-    // Check for existing auth token
-    const bootstrapAsync = async () => {
+    let cancelled = false;
+    let running = false;
+    let subscription: { remove: () => void } | null = null;
+    let lastAppState: AppStateStatus = AppState.currentState;
+
+    /** @returns true when storage could be read (token or genuinely none), false if unreadable. */
+    const loadStoredToken = async (): Promise<boolean> => {
       // A SecureStore read can fail transiently (iOS keychain locked right after a background
       // launch). That is "unknown", not "logged out": retry briefly and never clear the token.
       const retryDelaysMs = [300, 1000, 3000];
       for (let attempt = 0; ; attempt++) {
         try {
           const authToken = await authService.getToken();
-          setUserToken(authToken?.access_token || null);
-          break;
+          if (!cancelled) setUserToken(authToken?.access_token || null);
+          return true;
         } catch (e) {
-          if (e instanceof SecureStorageUnavailableError && attempt < retryDelaysMs.length) {
-            await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
-            continue;
+          if (e instanceof SecureStorageUnavailableError) {
+            if (attempt < retryDelaysMs.length) {
+              await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
+              if (cancelled) return true;
+              continue;
+            }
+            console.warn('[Auth] secure storage still unreadable; will retry when the app is next active');
+            return false;
           }
           console.error('Failed to load auth token', e);
-          break;
+          return true;
         }
       }
+    };
+
+    const stopWatching = () => {
+      subscription?.remove();
+      subscription = null;
+    };
+
+    // Still unreadable after the retries: try again on the next background -> active
+    // transition (e.g. once the device is unlocked) instead of stranding the user on login.
+    const watchForForeground = () => {
+      if (subscription) return;
+      subscription = AppState.addEventListener('change', async (next: AppStateStatus) => {
+        const becameActive = next === 'active' && lastAppState !== 'active';
+        lastAppState = next;
+        if (!becameActive || running || cancelled) return;
+        running = true;
+        const ok = await loadStoredToken();
+        running = false;
+        if (ok) stopWatching();
+      });
+    };
+
+    const bootstrapAsync = async () => {
+      running = true;
+      const ok = await loadStoredToken();
+      running = false;
+      if (cancelled) return;
       setIsLoading(false);
+      if (!ok) watchForForeground();
     };
 
     bootstrapAsync();
+    return () => {
+      cancelled = true;
+      stopWatching();
+    };
   }, []);
 
   const signIn = async (token: string) => {
