@@ -19,6 +19,8 @@ describe('DiscordSettingsScreen - "Refresh connection" (re-authenticate Discord)
     openBrowser.mockResolvedValue({ type: 'cancel' });
   });
 
+  afterEach(() => jest.restoreAllMocks());
+
   it('is offered as soon as the Discord account is linked, even when not in a voice channel', async () => {
     const screen = render(<DiscordSettingsScreen />);
     expect(await screen.findByText('discord.refreshConnection')).toBeTruthy();

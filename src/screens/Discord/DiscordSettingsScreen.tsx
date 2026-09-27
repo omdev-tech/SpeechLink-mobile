@@ -31,6 +31,11 @@ import { AuthContext } from '../../contexts/AuthContext';
 
 // Types from service
 import { DiscordServer, DiscordChannel } from '../../services/discordService';
+import {
+  DISCORD_OAUTH_REDIRECT_URL,
+  isDiscordCallbackError,
+  parseDiscordCallbackUrl,
+} from '../../services/discordOAuthRedirect';
 
 const DiscordSettingsScreen: React.FC = () => {
   // Move all hooks to the top level of the component function
@@ -87,6 +92,9 @@ const DiscordSettingsScreen: React.FC = () => {
   
   // Create refs outside of useEffect
   const wasConnectedRef = useRef(false);
+  // True while openAuthSessionAsync owns the OAuth round-trip; the global deep-link
+  // listener then ignores the discord-callback URL so it is not handled twice.
+  const authSessionActiveRef = useRef(false);
   const styles = makeStyles(theme, isDarkMode);
 
   // Create stable versions of Discord context functions
@@ -113,38 +121,48 @@ const DiscordSettingsScreen: React.FC = () => {
   // Load settings once when the screen is focused
   // REMOVING THIS useFocusEffect BLOCK
   
-  // Extract handleDeepLink to a stable callback
+  // Deep link back from the OAuth callback page when it arrives outside an auth session
+  // (e.g. the app was restarted while the browser was open).
   const handleDeepLink = useCallback(async (event: { url: string }) => {
     const url = event.url;
-    if (url.includes('discord-callback')) {
-      setAuthInProgress(false);
-      const code = url.split('code=')[1]?.split('&')[0];
-      if (code) {
-        try {
-          const success = await handleDiscordCallback(code);
-          if (success) {
-            Alert.alert(
-              t('discord.authSuccess'),
-              t('discord.authSuccessMessage')
-            );
-            // Reload settings after successful authentication
-            await stableLoadSettings();
-          } else {
-            Alert.alert(
-              t('discord.authFailed'),
-              t('discord.authFailedMessage')
-            );
-          }
-        } catch (err) {
-          console.error('Error handling Discord callback:', err);
-          Alert.alert(
-            t('discord.authFailed'),
-            t('discord.authFailedMessage')
-          );
-        }
-      }
+    if (!url.includes('discord-callback') || authSessionActiveRef.current) {
+      return;
     }
-  }, [handleDiscordCallback, stableLoadSettings]);
+    setAuthInProgress(false);
+    const params = parseDiscordCallbackUrl(url);
+    if (isDiscordCallbackError(params)) {
+      Alert.alert(t('discord.authFailed'), t('discord.authFailedMessage'));
+      return;
+    }
+    if (!params.code && !params.tempKey && params.status !== 'success') {
+      return;
+    }
+    try {
+      const success = await handleDiscordCallback(params.code ?? '', {
+        tempKey: params.tempKey,
+        maxAttempts: 5,
+      });
+      if (success) {
+        Alert.alert(
+          t('discord.authSuccess'),
+          t('discord.authSuccessMessage')
+        );
+        // Reload settings after successful authentication
+        await stableLoadSettings();
+      } else {
+        Alert.alert(
+          t('discord.authFailed'),
+          t('discord.authFailedMessage')
+        );
+      }
+    } catch (err) {
+      console.error('Error handling Discord callback:', err);
+      Alert.alert(
+        t('discord.authFailed'),
+        t('discord.authFailedMessage')
+      );
+    }
+  }, [handleDiscordCallback, stableLoadSettings, t]);
 
   // Handle deep link for Discord OAuth callback
   useEffect(() => {
@@ -174,13 +192,37 @@ const DiscordSettingsScreen: React.FC = () => {
         throw new Error('Failed to get Discord authorization URL');
       }
 
-      console.log('Opening Discord auth URL:', authUrl);
-      await WebBrowser.openBrowserAsync(authUrl);
+      console.log('Opening Discord auth session:', authUrl);
+      authSessionActiveRef.current = true;
+      // Closes the in-app browser by itself when the callback page redirects to
+      // DISCORD_OAUTH_REDIRECT_URL (see discordOAuthRedirect.ts for the contract).
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, DISCORD_OAUTH_REDIRECT_URL);
+      console.log('Discord auth session result:', result.type);
 
-      // When control returns here, the user has closed the browser
-      console.log('Browser closed, checking for successful authentication');
-      // On re-auth the old link still exists, so only a freshly claimed code counts.
-      const success = await handleDiscordCallback('', { requireFreshAuth: reauth, maxAttempts: 10 });
+      let success: boolean;
+      if (result.type === 'success') {
+        const params = parseDiscordCallbackUrl(result.url);
+        if (isDiscordCallbackError(params)) {
+          success = false;
+        } else {
+          // The backend confirmed the flow: claim what it handed back (or the pending
+          // temp key); its success is authoritative, so an existing link counts too.
+          success = await handleDiscordCallback(params.code ?? '', {
+            tempKey: params.tempKey,
+            maxAttempts: 5,
+          });
+        }
+      } else {
+        // cancel / dismiss: the user closed the browser. Older callback pages never
+        // redirect, so the OAuth may still have completed: look for it briefly.
+        // On re-auth the old link still exists, so only a freshly claimed code counts.
+        success = await handleDiscordCallback('', { requireFreshAuth: reauth, maxAttempts: 3 });
+        if (!success) {
+          console.log('Discord auth session closed without completing OAuth');
+          return false;
+        }
+      }
+
       if (success) {
         Alert.alert(
           t('discord.authSuccess'),
@@ -201,6 +243,7 @@ const DiscordSettingsScreen: React.FC = () => {
       );
       return false;
     } finally {
+      authSessionActiveRef.current = false;
       setAuthInProgress(false);
     }
   }, [getDiscordAuthUrl, handleDiscordCallback, t]);
