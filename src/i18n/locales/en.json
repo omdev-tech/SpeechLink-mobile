@@ -148,7 +148,8 @@
     "authCancelledMessage": "You cancelled the Discord authorization. You can connect again whenever you like.",
     "rateLimited": "Too many attempts. Please try again in a minute.",
     "authRetry": "Discord could not complete the connection. Please try again.",
-    "reconnectNeeded": "This Discord connection can no longer be completed. Please connect again from the Discord settings."
+    "reconnectNeeded": "This Discord connection can no longer be completed. Please connect again from the Discord settings.",
+    "temporarilyUnavailable": "SpeechLink is being updated. Please try again in a minute."
   },
   "home": {
     "title": "Voice Enhancer",

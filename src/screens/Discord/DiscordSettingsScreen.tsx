@@ -41,6 +41,9 @@ import { createPkcePair } from '../../services/discordPkce';
 import { discordAuthFailureKeys } from '../../services/discordAuthMessages';
 import { toDiscordApiError } from '../../services/discordService';
 
+// Server-side lifetime of a Discord connect handoff: later pending links cannot complete.
+const HANDOFF_TTL_MS = 10 * 60 * 1000;
+
 const DiscordSettingsScreen: React.FC = () => {
   // Move all hooks to the top level of the component function
   const { t } = useTranslation();
@@ -103,11 +106,13 @@ const DiscordSettingsScreen: React.FC = () => {
   // Redirect delivered through Linking during the auth session. On Android the session
   // can resolve 'dismiss' although the redirect did arrive this way.
   const pendingRedirectRef = useRef<string | null>(null);
-  // PKCE verifier of the Discord connect flow THIS screen instance started. Memory only
-  // (never persisted or logged), single-use: cleared by the completion attempt, replaced by
-  // the next flow, dropped on unmount. Kept after a cancel/dismiss so a late pending link
-  // of that same flow can still be completed.
-  const pkceVerifierRef = useRef<string | null>(null);
+  // PKCE verifier of the Discord connect flow THIS screen instance started, and when it
+  // started. Memory only (never persisted or logged). Cleared once the handoff completes or
+  // its code was spent (exchange_failed), when the flow is over without a pending link,
+  // after the server's 10-minute handoff TTL, and on unmount. Kept after a cancel/dismiss
+  // (a late pending link of this flow can still arrive) and after a rejected foreign or
+  // malformed handoff (an injected link must not burn the real one).
+  const pkceVerifierRef = useRef<{ verifier: string; startedAt: number } | null>(null);
   useEffect(() => () => {
     pkceVerifierRef.current = null;
   }, []);
@@ -140,16 +145,26 @@ const DiscordSettingsScreen: React.FC = () => {
   // Completes a PKCE handoff with this flow's verifier (consumed whatever the outcome).
   // Without a verifier (flow not started by this app instance) nothing is sent.
   const completeHandoff = useCallback(async (handoff: string | undefined) => {
-    const verifier = pkceVerifierRef.current;
-    pkceVerifierRef.current = null;
-    if (!handoff) {
-      return { success: false, code: 'invalid_handoff' };
+    const flow = pkceVerifierRef.current;
+    if (flow && Date.now() - flow.startedAt > HANDOFF_TTL_MS) {
+      pkceVerifierRef.current = null; // the server has expired this flow's handoff anyway
+      console.log('Ignoring Discord handoff: connect flow older than the handoff TTL');
+      return { success: false, code: 'reconnect_needed' };
     }
-    if (!verifier) {
+    if (!flow) {
       console.log('Ignoring Discord handoff: no connect flow in progress in this app instance');
       return { success: false, code: 'reconnect_needed' };
     }
-    return completeDiscordHandoff(handoff, verifier);
+    if (!handoff) {
+      return { success: false, code: 'invalid_handoff' };
+    }
+    const result = await completeDiscordHandoff(handoff, flow.verifier);
+    if (result.success || result.code === 'exchange_failed') {
+      // Used up. Other failures (invalid_handoff: a foreign/injected link, transient errors)
+      // keep it for the genuine link of this flow.
+      if (pkceVerifierRef.current === flow) pkceVerifierRef.current = null;
+    }
+    return result;
   }, [completeDiscordHandoff]);
 
   const alertAuthFailure = useCallback((code: string | undefined, reauth = false) => {
@@ -240,7 +255,7 @@ const DiscordSettingsScreen: React.FC = () => {
       // PKCE: only the S256 challenge goes out now; the verifier stays in memory until the
       // pending handoff is completed.
       const { verifier, challenge } = await createPkcePair();
-      pkceVerifierRef.current = verifier;
+      pkceVerifierRef.current = { verifier, startedAt: Date.now() };
       const authUrl = await getDiscordAuthUrl(challenge);
       if (!authUrl) {
         throw new Error('Failed to get Discord authorization URL');

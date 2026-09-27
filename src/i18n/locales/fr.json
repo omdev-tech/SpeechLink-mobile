@@ -145,7 +145,8 @@
     "authCancelledMessage": "Vous avez annulé l'autorisation Discord. Vous pouvez vous reconnecter quand vous le souhaitez.",
     "rateLimited": "Trop de tentatives. Veuillez réessayer dans une minute.",
     "authRetry": "Discord n'a pas pu finaliser la connexion. Veuillez réessayer.",
-    "reconnectNeeded": "Cette connexion Discord ne peut plus être finalisée. Veuillez vous reconnecter depuis les paramètres Discord."
+    "reconnectNeeded": "Cette connexion Discord ne peut plus être finalisée. Veuillez vous reconnecter depuis les paramètres Discord.",
+    "temporarilyUnavailable": "SpeechLink est en cours de mise à jour. Veuillez réessayer dans une minute."
   },
   "home": {
     "title": "Amplificateur Vocal",

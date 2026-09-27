@@ -6,6 +6,7 @@ export type DiscordAuthFailure =
   | 'access_denied'
   | 'rate_limited'
   | 'exchange_failed'
+  | 'temporarily_unavailable'
   | 'reconnect_needed'
   | string
   | undefined;
@@ -18,6 +19,8 @@ export function discordAuthFailureKeys(code: DiscordAuthFailure): [string, strin
       return ['discord.authFailed', 'discord.rateLimited'];
     case 'exchange_failed':
       return ['discord.authFailed', 'discord.authRetry'];
+    case 'temporarily_unavailable':
+      return ['discord.authFailed', 'discord.temporarilyUnavailable'];
     case 'reconnect_needed':
       return ['discord.authFailed', 'discord.reconnectNeeded'];
     default:

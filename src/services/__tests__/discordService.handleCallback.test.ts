@@ -99,10 +99,12 @@ describe('discordService PKCE handoff', () => {
   });
 
   it.each([
-    [429, 'rate_limited'],
-    [400, 'invalid_code_challenge'],
-  ])('getAuthUrl surfaces HTTP %s {code:%s} as a DiscordApiError', async (status, code) => {
-    get.mockRejectedValue(new Error(`API request failed with status ${status}: {"code":"${code}"}`));
+    [429, 'rate_limited', 'code'],
+    [429, 'rate_limited', 'error'],
+    [400, 'invalid_code_challenge', 'code'],
+    [400, 'invalid_code_challenge', 'error'],
+  ])('getAuthUrl surfaces HTTP %s %s (in body.%s) as a DiscordApiError', async (status, code, field) => {
+    get.mockRejectedValue(new Error(`API request failed with status ${status}: {"${field}":"${code}"}`));
     await expect(discordService.getAuthUrl('C'.repeat(43))).rejects.toMatchObject({ status, code });
   });
 
@@ -116,9 +118,35 @@ describe('discordService PKCE handoff', () => {
     });
   });
 
-  it.each(['invalid_request', 'invalid_handoff', 'exchange_failed'])('completeHandoff 400 %s -> failure with that code', async (code) => {
-    post.mockRejectedValue(new Error(`API request failed with status 400: {"code":"${code}","error":"x"}`));
-    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toEqual({ success: false, code });
+  // Real backend failure shape: {success:false, error:<code>, message} (the backend will also
+  // start emitting `code`); both must be understood.
+  it.each([
+    [400, 'invalid_request'],
+    [400, 'invalid_handoff'],
+    [400, 'exchange_failed'],
+    [503, 'temporarily_unavailable'],
+  ])('completeHandoff HTTP %s {error:%s} -> failure with that code', async (status, error) => {
+    post.mockRejectedValue(
+      new Error(`API request failed with status ${status}: {"success":false,"error":"${error}","message":"Human readable"}`)
+    );
+    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toEqual({ success: false, code: error });
+  });
+
+  it('completeHandoff: `code` wins over `error` when the backend sends both', async () => {
+    post.mockRejectedValue(
+      new Error('API request failed with status 400: {"success":false,"code":"exchange_failed","error":"invalid_request"}')
+    );
+    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toEqual({ success: false, code: 'exchange_failed' });
+  });
+
+  it('completeHandoff: a 200 {success:false, error} body is read too', async () => {
+    post.mockResolvedValue({ success: false, error: 'invalid_handoff', message: 'x' });
+    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toEqual({ success: false, code: 'invalid_handoff' });
+  });
+
+  it('ignores an `error` that is free text rather than a code', async () => {
+    post.mockRejectedValue(new Error('API request failed with status 400: {"error":"Something went wrong"}'));
+    await expect(discordService.completeHandoff('H'.repeat(43), 'V'.repeat(43))).resolves.toEqual({ success: false, code: undefined });
   });
 
   it('completeHandoff after a 401 (session handled by apiService) -> failure', async () => {

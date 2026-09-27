@@ -52,7 +52,7 @@ export interface DiscordCallbackOptions {
 
 export interface DiscordHandoffResult {
   success: boolean;
-  /** Backend error code (invalid_request, invalid_handoff, exchange_failed, ...). */
+  /** Backend error code (invalid_request, invalid_handoff, exchange_failed, temporarily_unavailable, ...). */
   code?: string;
 }
 
@@ -64,7 +64,22 @@ export class DiscordApiError extends Error {
   }
 }
 
-/** apiService throws `API request failed with status <N>: <body>`: recover status + body.code. */
+const ERROR_CODE_FORMAT = /^[a-z_]+$/;
+
+/**
+ * Backend error code from a response body: `code`, else `error` (the backend's current
+ * failure shape is {success:false, error:<code>, message}). Free text is not a code.
+ */
+export function discordErrorCode(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const { code, error } = body as { code?: unknown; error?: unknown };
+  for (const candidate of [code, error]) {
+    if (typeof candidate === 'string' && ERROR_CODE_FORMAT.test(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/** apiService throws `API request failed with status <N>: <body>`: recover status + code. */
 export function toDiscordApiError(error: unknown): DiscordApiError {
   if (error instanceof DiscordApiError) return error;
   const message = error instanceof Error ? error.message : String(error);
@@ -72,8 +87,7 @@ export function toDiscordApiError(error: unknown): DiscordApiError {
   let code: string | undefined;
   if (match) {
     try {
-      const body = JSON.parse(match[2]);
-      if (body && typeof body.code === 'string') code = body.code;
+      code = discordErrorCode(JSON.parse(match[2]));
     } catch {
       // non-JSON body
     }
@@ -132,7 +146,7 @@ export const discordService = {
       if (response && response.success === true && response.linked === true) {
         return { success: true };
       }
-      return { success: false, code: response?.code };
+      return { success: false, code: discordErrorCode(response) };
     } catch (error) {
       const apiError = toDiscordApiError(error);
       console.error('Discord complete-handoff failed:', apiError.status, apiError.code);
