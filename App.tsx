@@ -1,3 +1,5 @@
+// Must stay the first import: redacts tokens/codes from every console call that follows.
+import './src/utils/installSafeConsole';
 import React, { useEffect } from 'react';
 import { I18nManager, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';

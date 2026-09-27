@@ -84,7 +84,7 @@ const LoginScreen: React.FC = () => {
       
       if (!token) {
         setLoginError('Login successful but no authentication token received');
-        console.error('No token in login response:', response);
+        console.error('No token in login response; keys:', Object.keys(response || {}));
         return;
       }
       

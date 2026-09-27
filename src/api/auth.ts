@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as secureStorage from '../services/secureStorage';
 import { API_CONFIG } from '../config/api';
 import { 
   LoginCredentials, 
@@ -22,7 +22,7 @@ const apiClient = axios.create({
 
 // Add auth token to requests
 apiClient.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('auth_token');
+  const token = await secureStorage.getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -66,7 +66,7 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
       console.log('Successfully stored authentication tokens after login');
     } else if (responseData.accessToken) {
       // If we only have access token, just store that
-      await AsyncStorage.setItem('auth_token', responseData.accessToken);
+      await secureStorage.setToken(responseData.accessToken);
       console.log('Stored only access token (no refresh token)');
     } else {
       console.warn('No tokens received in login response');
@@ -79,7 +79,6 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
       isAxiosError: axios.isAxiosError(error),
       status: axios.isAxiosError(error) ? error.response?.status : undefined,
       data: axios.isAxiosError(error) ? error.response?.data : undefined,
-      headers: axios.isAxiosError(error) ? error.response?.headers : undefined
     });
     
     handleAuthError(error);
@@ -124,7 +123,7 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
       console.log('Successfully stored authentication tokens after registration');
     } else if (responseData.accessToken) {
       // If we only have access token, just store that
-      await AsyncStorage.setItem('auth_token', responseData.accessToken);
+      await secureStorage.setToken(responseData.accessToken);
       console.log('Stored only access token (no refresh token)');
     } else {
       console.warn('No tokens received in registration response');
@@ -137,7 +136,6 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
       isAxiosError: axios.isAxiosError(error),
       status: axios.isAxiosError(error) ? error.response?.status : undefined,
       data: axios.isAxiosError(error) ? error.response?.data : undefined,
-      headers: axios.isAxiosError(error) ? error.response?.headers : undefined
     });
     
     handleAuthError(error);
@@ -189,97 +187,6 @@ export const refreshTokens = async (refreshToken: string): Promise<TokenPair> =>
 };
 
 /**
- * Login with Google authorization code using PKCE
- */
-export const loginWithGoogle = async (authorizationCode: string, codeVerifier?: string) => {
-  try {
-    if (!authorizationCode) {
-      throw new Error('Google authorization code is required');
-    }
-
-    console.log('Sending Google authorization code to backend');
-    console.log('Authorization Code:', authorizationCode);
-    if (codeVerifier) {
-      console.log('Code Verifier available:', { length: codeVerifier.length });
-    }
-    
-    const response = await apiClient.post('/api/auth/mobile/google', { 
-      code: authorizationCode,
-      redirectUri: 'com.naqued.speechlinkmobile://',
-      codeVerifier: codeVerifier // Send code verifier if available
-    });
-    
-    console.log('Backend response status:', response.status);
-    console.log('Backend response headers:', response.headers);
-    console.log('Backend response data:', JSON.stringify(response.data, null, 2));
-    
-    if (!response.data || !response.data.token) {
-      console.log('Invalid response from server:', response.data);
-      throw new Error('Invalid response from server: token missing');
-    }
-    
-    console.log('Successfully authenticated with Google');
-    
-    // Store the tokens
-    if (response.data.refreshToken) {
-      await storeAuthTokens(response.data.token, response.data.refreshToken);
-    } else {
-      // If no refresh token, just store the access token
-      await AsyncStorage.setItem('auth_token', response.data.token);
-    }
-    
-    return response.data;
-  } catch (error) {
-    // Log specific error details
-    if (axios.isAxiosError(error)) {
-      console.error('Google Sign-In API error:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers
-        }
-      });
-      
-      // Rethrow with more specific message if available
-      if (error.response?.data?.message) {
-        throw new Error(`Authentication failed: ${error.response.data.message}`);
-      }
-    } else {
-      console.error('Google Sign-In failed:', error);
-    }
-    throw error;
-  }
-};
-
-/**
- * Login with Apple
- */
-export const loginWithApple = async (identityToken: string, authorizationCode: string) => {
-  try {
-    const response = await apiClient.post('/api/auth/apple', {
-      identityToken,
-      authorizationCode
-    });
-    
-    // Store the tokens
-    if (response.data.refreshToken) {
-      await storeAuthTokens(response.data.accessToken, response.data.refreshToken);
-    } else {
-      // If no refresh token, just store the access token
-      await AsyncStorage.setItem('auth_token', response.data.accessToken);
-    }
-    
-    return response.data;
-  } catch (error) {
-    handleAuthError(error);
-    throw error;
-  }
-};
-
-/**
  * Logout the user
  */
 export const logout = async () => {
@@ -288,14 +195,14 @@ export const logout = async () => {
     await apiClient.post('/api/auth/mobile/logout');
     
     // Clear tokens from storage
-    await AsyncStorage.multiRemove(['auth_token', 'refresh_token']);
+    await secureStorage.clearTokens();
     
     return { success: true };
   } catch (error) {
     console.error('Logout failed:', error);
     
     // Even if the API call fails, clear tokens locally
-    await AsyncStorage.multiRemove(['auth_token', 'refresh_token']);
+    await secureStorage.clearTokens();
     
     throw error;
   }
@@ -313,13 +220,13 @@ const storeAuthTokens = async (accessToken?: string | null, refreshToken?: strin
   
   try {
     if (accessToken) {
-      await AsyncStorage.setItem('auth_token', accessToken);
+      await secureStorage.setToken(accessToken);
     } else {
       console.warn('Attempted to store null/undefined access token');
     }
     
     if (refreshToken) {
-      await AsyncStorage.setItem('refresh_token', refreshToken);
+      await secureStorage.setRefreshToken(refreshToken);
     }
   } catch (error) {
     console.error('Error storing auth tokens:', error);

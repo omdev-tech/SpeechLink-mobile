@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../services/authService';
+import { SecureStorageUnavailableError } from '../services/secureStorage';
 import { apiService } from '../services/apiService';
 import googleAuthService from '../services/googleAuthService';
 
@@ -43,11 +44,22 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   useEffect(() => {
     // Check for existing auth token
     const bootstrapAsync = async () => {
-      try {
-        const authToken = await authService.getToken();
-        setUserToken(authToken?.access_token || null);
-      } catch (e) {
-        console.error('Failed to load auth token', e);
+      // A SecureStore read can fail transiently (iOS keychain locked right after a background
+      // launch). That is "unknown", not "logged out": retry briefly and never clear the token.
+      const retryDelaysMs = [300, 1000, 3000];
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const authToken = await authService.getToken();
+          setUserToken(authToken?.access_token || null);
+          break;
+        } catch (e) {
+          if (e instanceof SecureStorageUnavailableError && attempt < retryDelaysMs.length) {
+            await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
+            continue;
+          }
+          console.error('Failed to load auth token', e);
+          break;
+        }
       }
       setIsLoading(false);
     };
@@ -69,10 +81,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         token_type: 'bearer'
       };
       
-      console.log('Signing in with token:', { 
-        tokenLength: token.length,
-        tokenStart: token.substring(0, 10) + '...'
-      });
+      console.log('Signing in', { tokenLength: token.length });
       
       // Save the token using our auth service
       await authService.saveToken(tokenObj);

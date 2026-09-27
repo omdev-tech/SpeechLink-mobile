@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as secureStorage from './secureStorage';
 import { API_CONFIG } from '../config/api';
 import { 
   login, 
@@ -14,9 +14,6 @@ import {
   AuthResponse, 
   PasswordResetConfirm 
 } from '../types/auth';
-
-const ACCESS_TOKEN_KEY = 'auth_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
 
 export interface AuthToken {
   access_token: string;
@@ -184,6 +181,11 @@ class AuthService {
         console.log('[Auth] Token refresh successful');
         return true;
       } catch (error) {
+        if (error instanceof secureStorage.SecureStorageUnavailableError) {
+          // Couldn't READ the token (e.g. keychain locked) — not a rejected session. Keep it.
+          console.warn('[Auth] Token refresh skipped: secure storage temporarily unavailable');
+          throw error;
+        }
         console.error('[Auth] Token refresh failed:', error);
         // If refresh fails, log the user out
         await this.clearToken();
@@ -242,7 +244,7 @@ class AuthService {
           console.log('Successfully saved development token with enhanced fields');
           return enhancedToken;
         } else {
-          console.error('Invalid token response - missing access_token:', data);
+          console.error('Invalid token response - missing access_token; keys:', Object.keys(data || {}));
           throw new Error('Invalid token response');
         }
       } catch (error) {
@@ -265,12 +267,14 @@ class AuthService {
     }
 
     try {
-      const storedToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      const storedToken = await secureStorage.getToken();
       if (storedToken) {
         this.token = { access_token: storedToken, token_type: 'bearer' };
         return this.token;
       }
     } catch (error) {
+      // "Unknown" (keychain locked...) must not look like "logged out" to callers.
+      if (error instanceof secureStorage.SecureStorageUnavailableError) throw error;
       console.error('Error retrieving stored token:', error);
     }
 
@@ -291,7 +295,7 @@ class AuthService {
         hasExpiresIn: !!token.expires_in,
       });
       
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token.access_token);
+      await secureStorage.setToken(token.access_token);
     } catch (error) {
       console.error('Error saving token:', error);
     }
@@ -299,8 +303,8 @@ class AuthService {
 
   public async clearToken(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
       this.token = null;
+      await secureStorage.clearTokens();
     } catch (error) {
       console.error('Error clearing token:', error);
     }
