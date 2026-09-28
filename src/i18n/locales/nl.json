@@ -859,7 +859,7 @@
     "experimental": "Experimenteel",
     "selected": "Geselecteerd",
     "premiumRequired": "Vereist INTENSIVE of DAGELIJKSE COMPANION plan",
-    "standardDesc": "Snelle, betrouwbare synthese met 32 talen",
+    "standardDesc": "Snelle, betrouwbare synthese met 85 talen",
     "premiumDesc": "Geavanceerde emotionele stemmen met meer dan 70 talen",
     "experimentalWarning": "Dit model is experimenteel en kan hogere latentie hebben",
     "characterLimit": "Tekenlimiet: {{limit}}",

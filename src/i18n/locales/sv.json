@@ -859,7 +859,7 @@
     "experimental": "Experimentell",
     "selected": "Vald",
     "premiumRequired": "Kräver INTENSIVE eller DAILY_COMPANION plan",
-    "standardDesc": "Snabb, pålitlig syntes med 32 språk",
+    "standardDesc": "Snabb, pålitlig syntes med 85 språk",
     "premiumDesc": "Avancerade känslomässiga röster med över 70 språk",
     "experimentalWarning": "Denna modell är experimentell och kan ha högre latens",
     "characterLimit": "Teckenbegränsning: {{limit}}",

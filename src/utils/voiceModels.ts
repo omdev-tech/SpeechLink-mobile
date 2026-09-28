@@ -6,7 +6,7 @@
  */
 
 export const VOICE_MODELS = {
-  ELEVEN_LABS: 'eleven_flash_v2_5',
+  ELEVEN_LABS: 'eleven_v4_turbo',
   ELEVEN_LABS_PREMIUM: 'eleven_v3',
   WHISPER: 'tts-1'
 } as const;
@@ -27,11 +27,11 @@ export interface ModelMetadata {
 
 export const MODEL_CONFIG: Record<string, ModelMetadata> = {
   [VOICE_MODELS.ELEVEN_LABS]: {
-    characterLimit: 40000,
+    characterLimit: 10000,
     latency: 'low',
-    emotionalRange: 'standard',
-    languages: 32,
-    description: 'Ultra-fast model optimized for real-time use (~75ms)',
+    emotionalRange: 'advanced',
+    languages: 85,
+    description: 'Real-time model with emotional tags support (~100ms)',
     experimental: false
   },
   [VOICE_MODELS.ELEVEN_LABS_PREMIUM]: {
@@ -43,6 +43,14 @@ export const MODEL_CONFIG: Record<string, ModelMetadata> = {
     experimental: true
   }
 };
+
+/**
+ * Map a saved/unknown model ID to one the app supports.
+ * Legacy IDs (e.g. 'eleven_flash_v2_5', which reads tags aloud) resolve to the default.
+ */
+export function resolveModelId(modelId?: string | null): string {
+  return modelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? modelId : VOICE_MODELS.ELEVEN_LABS;
+}
 
 export function getModelConfig(modelId: string): ModelMetadata {
   return MODEL_CONFIG[modelId] || MODEL_CONFIG[VOICE_MODELS.ELEVEN_LABS];
@@ -62,9 +70,9 @@ export function supportsEmotionalTags(modelId: string): boolean {
 
 /**
  * Languages that require v3 model
- * These languages are only available in the premium model
+ * Empty since v4 Turbo (default) covers every language v3 does, including Urdu
  */
-export const V3_ONLY_LANGUAGES = ['urd'];
+export const V3_ONLY_LANGUAGES: string[] = [];
 
 export function requiresV3Model(languageCode: string): boolean {
   return V3_ONLY_LANGUAGES.includes(languageCode);

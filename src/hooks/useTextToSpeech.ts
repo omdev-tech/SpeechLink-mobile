@@ -12,6 +12,7 @@ import { requestAudioPermissions } from '../utils/permissions';
 import nativeAudioOutput from '../services/nativeAudioOutputService';
 import i18next from 'i18next';
 import { voiceSettingsService } from '../services/voiceSettingsService';
+import { resolveModelId } from '../utils/voiceModels';
 
 // Helper function to configure audio output device
 const configureAudioOutput = async (device: string) => {
@@ -435,7 +436,8 @@ export const useTextToSpeech = (): UseTextToSpeechResult => {
       // Only add fields if they're defined
       if (voiceId) request.voiceId = voiceId;
       if (provider) request.provider = provider;
-      if (savedModelId) request.modelId = savedModelId; // Add modelId from database
+      // Always send a supported model: unset or legacy (Flash v2.5) settings resolve to v4 Turbo
+      request.modelId = resolveModelId(savedModelId);
       if (language) {
         request.settings = {
           ...(request.settings || {}),

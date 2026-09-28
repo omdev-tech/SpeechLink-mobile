@@ -925,7 +925,7 @@
     "experimental": "Experimental",
     "selected": "Napili",
     "premiumRequired": "Nangangailangan ng INTENSIVE o DAILY_COMPANION plan",
-    "standardDesc": "Mabilis, maaasahang synthesis na may 32 wika",
+    "standardDesc": "Mabilis, maaasahang synthesis na may 85 wika",
     "premiumDesc": "Advanced na emotional voices na may 70+ wika",
     "experimentalWarning": "Ang model na ito ay experimental at maaaring may mas mataas na latency",
     "characterLimit": "Character limit: {{limit}}",

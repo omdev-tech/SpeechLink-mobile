@@ -550,7 +550,7 @@
     "experimental": "Eksperimen",
     "selected": "Dipilih",
     "premiumRequired": "Memerlukan pelan INTENSIF atau SAHABAT HARIAN",
-    "standardDesc": "Sintesis pantas dan boleh dipercayai dengan 32 bahasa",
+    "standardDesc": "Sintesis pantas dan boleh dipercayai dengan 85 bahasa",
     "premiumDesc": "Suara emosi lanjutan dengan lebih 70 bahasa",
     "experimentalWarning": "Model ini adalah eksperimen dan mungkin mempunyai latensi yang lebih tinggi",
     "characterLimit": "Had aksara: {{limit}}",

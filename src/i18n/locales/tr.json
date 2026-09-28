@@ -859,7 +859,7 @@
     "experimental": "Deneysel",
     "selected": "Seçildi",
     "premiumRequired": "INTENSIVE veya DAILY_COMPANION planı gerektirir",
-    "standardDesc": "32 dil ile hızlı, güvenilir sentez",
+    "standardDesc": "85 dil ile hızlı, güvenilir sentez",
     "premiumDesc": "70'ten fazla dil ile gelişmiş duygusal sesler",
     "experimentalWarning": "Bu model deneyseldir ve daha yüksek gecikme süresi olabilir",
     "characterLimit": "Karakter limiti: {{limit}}",

@@ -794,7 +794,7 @@
     "experimental": "実験的",
     "selected": "選択済み",
     "premiumRequired": "INTENSIVEまたはDAILY_COMPANIONプランが必要です",
-    "standardDesc": "32言語の高速で信頼性の高い合成",
+    "standardDesc": "85言語の高速で信頼性の高い合成",
     "premiumDesc": "70以上の言語の高度な感情音声",
     "experimentalWarning": "このモデルは実験的で、より高いレイテンシーがある可能性があります",
     "characterLimit": "文字制限: {{limit}}",

@@ -794,7 +794,7 @@
     "experimental": "Experimentell",
     "selected": "Ausgewählt",
     "premiumRequired": "Erfordert INTENSIV oder TÄGLICHER BEGLEITER Plan",
-    "standardDesc": "Schnelle, zuverlässige Synthese mit 32 Sprachen",
+    "standardDesc": "Schnelle, zuverlässige Synthese mit 85 Sprachen",
     "premiumDesc": "Fortgeschrittene emotionale Stimmen mit über 70 Sprachen",
     "experimentalWarning": "Dieses Modell ist experimentell und kann höhere Latenz haben",
     "characterLimit": "Zeichenlimit: {{limit}}",

@@ -859,7 +859,7 @@
     "experimental": "Eksperymentalny",
     "selected": "Wybrano",
     "premiumRequired": "Wymaga planu INTENSIVE lub DAILY_COMPANION",
-    "standardDesc": "Szybka, niezawodna synteza z 32 językami",
+    "standardDesc": "Szybka, niezawodna synteza z 85 językami",
     "premiumDesc": "Zaawansowane głosy emocjonalne z ponad 70 językami",
     "experimentalWarning": "Ten model jest eksperymentalny i może mieć wyższą latencję",
     "characterLimit": "Limit znaków: {{limit}}",

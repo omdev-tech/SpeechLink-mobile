@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, ToastAndroid, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { VOICE_MODELS, MODEL_CONFIG } from '../utils/voiceModels';
+import { VOICE_MODELS, MODEL_CONFIG, resolveModelId } from '../utils/voiceModels';
 import { useFeatureGate } from '../contexts/FeatureGateContext';
 
 interface ModelSelectionModalProps {
@@ -23,12 +23,13 @@ interface ModelSelectionModalProps {
 export const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
   visible,
   onClose,
-  selectedModel = VOICE_MODELS.ELEVEN_LABS,
+  selectedModel: savedModel,
   onModelChange,
   onLearnMore,
   theme
 }) => {
   const { t } = useTranslation();
+  const selectedModel = resolveModelId(savedModel);
   const { canUseElevenV3, isPremiumUser, userPlan } = useFeatureGate();
   const [isChanging, setIsChanging] = useState(false);
   
@@ -136,10 +137,13 @@ export const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                   💰 {t('modelSelector.costEfficient')}
                 </Text>
                 <Text style={[styles.featureText, { color: theme.text + '99' }]}>
-                  📝 {t('modelSelector.characterLimit', { limit: '40K' })}
+                  🎭 {t('modelSelector.emotionalVoices')}
                 </Text>
                 <Text style={[styles.featureText, { color: theme.text + '99' }]}>
-                  ⚡ {t('general.fast') || 'Ultra-low latency'} (~75ms)
+                  📝 {t('modelSelector.characterLimit', { limit: '10K' })}
+                </Text>
+                <Text style={[styles.featureText, { color: theme.text + '99' }]}>
+                  ⚡ {t('general.fast') || 'Ultra-low latency'} (~100ms)
                 </Text>
               </View>
             </TouchableOpacity>

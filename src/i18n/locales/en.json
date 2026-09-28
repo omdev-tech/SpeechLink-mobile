@@ -917,7 +917,7 @@
     "experimental": "Experimental",
     "selected": "Selected",
     "premiumRequired": "Requires INTENSIVE or DAILY_COMPANION plan",
-    "standardDesc": "Fast, reliable synthesis with 32 languages",
+    "standardDesc": "Fast, reliable synthesis with 85 languages",
     "premiumDesc": "Advanced emotional voices with 70+ languages",
     "experimentalWarning": "This model is experimental and may have higher latency",
     "characterLimit": "Character limit: {{limit}}",

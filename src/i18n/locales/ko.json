@@ -796,7 +796,7 @@
     "experimental": "실험적",
     "selected": "선택됨",
     "premiumRequired": "INTENSIVE 또는 DAILY_COMPANION 플랜이 필요합니다",
-    "standardDesc": "32개 언어의 빠르고 안정적인 합성",
+    "standardDesc": "85개 언어의 빠르고 안정적인 합성",
     "premiumDesc": "70개 이상의 언어를 지원하는 고급 감정 음성",
     "experimentalWarning": "이 모델은 실험적이며 더 높은 지연 시간이 있을 수 있습니다",
     "characterLimit": "문자 제한: {{limit}}",

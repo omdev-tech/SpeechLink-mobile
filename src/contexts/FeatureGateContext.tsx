@@ -6,7 +6,7 @@
  */
 
 import React, { createContext, useContext, useMemo, ReactNode } from 'react';
-import { VOICE_MODELS, V3_ONLY_LANGUAGES } from '../utils/voiceModels';
+import { VOICE_MODELS, V3_ONLY_LANGUAGES, resolveModelId } from '../utils/voiceModels';
 
 interface FeatureGateContextType {
   // Subscription-based features
@@ -57,11 +57,11 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
     const isPremiumUser = PREMIUM_PLANS.some(p => p.toLowerCase() === normalizedPlan);
     
     // Check if current model is v3
-    const isV3AlphaModel = selectedModel === VOICE_MODELS.ELEVEN_LABS_PREMIUM;
+    const isV3AlphaModel = resolveModelId(selectedModel) === VOICE_MODELS.ELEVEN_LABS_PREMIUM;
     
     // Feature flags
     const canUseElevenV3 = isPremiumUser;
-    const canUseEmotionalTags = isPremiumUser && isV3AlphaModel;
+    const canUseEmotionalTags = true; // Both v4 Turbo (default) and v3 perform audio tags
     const canUseV3Languages = isV3AlphaModel; // Model-gated only (future languages)
     
     // Voice access - Premium voices require INTENSIVE or DAILY_COMPANION plan
@@ -69,9 +69,6 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
     
     // Helper function to check if feature requires model switch
     const requiresModelSwitch = (feature: 'emotionalTags' | 'v3Languages'): boolean => {
-      if (feature === 'emotionalTags') {
-        return isPremiumUser && !isV3AlphaModel;
-      }
       if (feature === 'v3Languages') {
         return !isV3AlphaModel;
       }
@@ -80,7 +77,7 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
     
     // Helper function to check if feature requires premium plan
     const requiresPremiumPlan = (feature: string): boolean => {
-      const premiumFeatures = ['emotionalTags', 'elevenV3', 'premiumVoices'];
+      const premiumFeatures = ['elevenV3', 'premiumVoices'];
       return premiumFeatures.includes(feature) && !isPremiumUser;
     };
     

@@ -39,7 +39,7 @@ import { ModelSelector } from '../../components/ModelSelector';
 import { EmotionalTagSelector } from '../../components/EmotionalTagSelector';
 import { ModelInfoModal } from '../../components/ModelInfoModal';
 import { ModelSelectionModal } from '../../components/ModelSelectionModal';
-import { VOICE_MODELS, getCharacterLimit } from '../../utils/voiceModels';
+import { VOICE_MODELS, getCharacterLimit, resolveModelId } from '../../utils/voiceModels';
 import { insertTagAtPosition, EmotionalTag } from '../../utils/emotionalTags';
 import { canUseElevenV3 } from '../../utils/subscriptionUtils';
 
@@ -111,7 +111,7 @@ const TypingModal: React.FC<{
   const inputRef = React.useRef<TextInput>(null);
   
   // Use saved model from database, fallback to default
-  const selectedModel = savedModelId || VOICE_MODELS.ELEVEN_LABS;
+  const selectedModel = resolveModelId(savedModelId);
   
   // Get character limit based on selected model
   const characterLimit = getCharacterLimit(selectedModel);
@@ -124,36 +124,8 @@ const TypingModal: React.FC<{
     console.log('[TypingModal] Can use Eleven V3:', canUseElevenV3(userPlanId || ''));
   }, [userPlanId, isPremium]);
   
-  // Handle tag insertion with auto-switch to v3 Alpha
-  const handleTagSelect = async (tag: EmotionalTag) => {
-    // Check if we need to switch to v3 Alpha model
-    if (selectedModel !== VOICE_MODELS.ELEVEN_LABS_PREMIUM) {
-      // Auto-switch to Premium model
-      if (onModelChange) {
-        try {
-          await onModelChange(VOICE_MODELS.ELEVEN_LABS_PREMIUM);
-          
-          // Show toast notification
-          if (Platform.OS === 'android') {
-            const { ToastAndroid } = require('react-native');
-            ToastAndroid.show(
-              t('modelSelection.emotionalTagSwitch'),
-              ToastAndroid.LONG
-            );
-          } else {
-            // iOS fallback
-            Alert.alert(
-              t('general.success'),
-              t('modelSelection.emotionalTagSwitch'),
-              [{ text: 'OK' }]
-            );
-          }
-        } catch (error) {
-          console.error('Error switching model:', error);
-        }
-      }
-    }
-    
+  // Handle tag insertion (every model supports tags, no model switch needed)
+  const handleTagSelect = (tag: EmotionalTag) => {
     // Insert the tag
     const result = insertTagAtPosition(customMessage, tag.value, cursorPosition);
     onChangeText(result.newText);
@@ -265,13 +237,11 @@ const TypingModal: React.FC<{
                   />
                   
                   {/* Emotional Tags Tip */}
-                  {isPremium && selectedModel === VOICE_MODELS.ELEVEN_LABS_PREMIUM && (
-                    <View style={[styles.tipBox, { backgroundColor: theme.primary + '15', borderColor: theme.primary }]}>
-                      <Text style={[styles.tipText, { color: theme.text }]}>
-                        {t('emotionalTags.emotionLimit')}
-                      </Text>
-                    </View>
-                  )}
+                  <View style={[styles.tipBox, { backgroundColor: theme.primary + '15', borderColor: theme.primary }]}>
+                    <Text style={[styles.tipText, { color: theme.text }]}>
+                      {t('emotionalTags.emotionLimit')}
+                    </Text>
+                  </View>
                 </View>
               )}
               
@@ -570,7 +540,7 @@ const AACBoardScreen: React.FC = () => {
   // Check if user has premium access for v3 model
   const userPlanId = profileData?.subscription?.tier;
   const hasPremiumAccess = userPlanId ? canUseElevenV3(userPlanId) : false;
-  const currentModelId = userSettings?.voiceSettings?.modelId || 'eleven_flash_v2_5';
+  const currentModelId = resolveModelId(userSettings?.voiceSettings?.modelId);
   
   // Modal state
   const [sentenceFormVisible, setSentenceFormVisible] = useState(false);
@@ -1618,13 +1588,13 @@ const AACBoardScreen: React.FC = () => {
                   >
                     <View style={styles.modelIconContainer}>
                       <Ionicons 
-                        name={currentModelId === 'eleven_v3' ? 'sparkles' : 'flash'} 
+                        name={currentModelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? 'sparkles' : 'flash'} 
                         size={24} 
                         color={theme.primary} 
                       />
-                      <View style={[styles.modelBadge, { backgroundColor: currentModelId === 'eleven_v3' ? '#FFD700' : theme.primary }]}>
+                      <View style={[styles.modelBadge, { backgroundColor: currentModelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? '#FFD700' : theme.primary }]}>
                         <Text style={styles.modelBadgeText}>
-                          {currentModelId === 'eleven_v3' ? 'v3' : 'v2.5'}
+                          {currentModelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? 'v3' : 'v4'}
                         </Text>
                       </View>
                     </View>

@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { VOICE_MODELS } from '../utils/voiceModels';
+import { VOICE_MODELS, resolveModelId } from '../utils/voiceModels';
 import { ModelSelectionModal } from './ModelSelectionModal';
 import { ModelInfoModal } from './ModelInfoModal';
 
@@ -27,7 +27,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [showInfoModal, setShowInfoModal] = useState(false);
   
   // Determine current model display
-  const isStandard = selectedModel === VOICE_MODELS.ELEVEN_LABS;
+  const isStandard = resolveModelId(selectedModel) === VOICE_MODELS.ELEVEN_LABS;
   const modelIcon = isStandard ? '⚡' : '🎭';
   const modelName = isStandard ? t('modelSelector.standard') : t('modelSelector.premium');
   
