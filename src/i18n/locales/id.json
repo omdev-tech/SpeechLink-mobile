@@ -859,7 +859,7 @@
     "experimental": "Eksperimental",
     "selected": "Dipilih",
     "premiumRequired": "Memerlukan paket INTENSIVE atau DAILY_COMPANION",
-    "standardDesc": "Sintesis cepat dan andal dengan 32 bahasa",
+    "standardDesc": "Sintesis cepat dan andal dengan 85 bahasa",
     "premiumDesc": "Suara emosional lanjutan dengan lebih dari 70 bahasa",
     "experimentalWarning": "Model ini eksperimental dan mungkin memiliki latensi lebih tinggi",
     "characterLimit": "Batas karakter: {{limit}}",

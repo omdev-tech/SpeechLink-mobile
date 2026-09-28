@@ -794,7 +794,7 @@
     "experimental": "实验性",
     "selected": "已选择",
     "premiumRequired": "需要INTENSIVE或DAILY_COMPANION计划",
-    "standardDesc": "快速可靠的合成，支持32种语言",
+    "standardDesc": "快速可靠的合成，支持85种语言",
     "premiumDesc": "高级情感语音，支持70多种语言",
     "experimentalWarning": "此模型为实验性，可能具有更高的延迟",
     "characterLimit": "字符限制: {{limit}}",

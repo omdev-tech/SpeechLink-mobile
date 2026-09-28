@@ -8,16 +8,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { EmotionalTag, EMOTIONAL_TAGS, getTagsByCategory } from '../utils/emotionalTags';
-import { useFeatureGate } from '../contexts/FeatureGateContext';
-import { VOICE_MODELS } from '../utils/voiceModels';
+import { EmotionalTag, getTagsByCategory } from '../utils/emotionalTags';
 
 interface EmotionalTagSelectorProps {
   onTagSelect: (tag: EmotionalTag) => void;
   theme: any;
   maxHeight?: number;
   onLearnMore?: () => void;
-  selectedModel?: string; // Optional prop to override context value
+  selectedModel?: string; // Unused: every model now supports tags (kept for caller compatibility)
 }
 
 // Categories match the backend tagConfig.ts structure
@@ -31,18 +29,10 @@ const CATEGORIES = [
 export const EmotionalTagSelector: React.FC<EmotionalTagSelectorProps> = ({
   onTagSelect,
   theme,
-  maxHeight = 300,
-  onLearnMore,
-  selectedModel
+  maxHeight = 300
 }) => {
   const { t } = useTranslation();
-  const { isV3AlphaModel: contextIsV3AlphaModel, isPremiumUser } = useFeatureGate();
-  
-  // Use prop if provided, otherwise fall back to context value
-  const isV3AlphaModel = selectedModel 
-    ? selectedModel === VOICE_MODELS.ELEVEN_LABS_PREMIUM 
-    : contextIsV3AlphaModel;
-  
+
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['emotion']) // Expand emotions by default
   );
@@ -57,51 +47,10 @@ export const EmotionalTagSelector: React.FC<EmotionalTagSelectorProps> = ({
     setExpandedCategories(newExpanded);
   };
 
-  const handleTagPress = (tag: EmotionalTag) => {
-    // Only lock for non-premium users
-    if (!isPremiumUser && tag.requiresPremium) {
-      // Tag locked - don't allow
-      return;
-    }
-    // Premium users can always click (auto-switch happens in parent component)
-    onTagSelect(tag);
-  };
-
   return (
     <View style={styles.container}>
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('emotionalTags.title')}</Text>
       
-      {/* Info/Warning Banner */}
-      {!isPremiumUser ? (
-        // Non-premium user: Show upgrade message
-        <View style={[styles.premiumWarning, { backgroundColor: theme.primary + '20', borderColor: theme.primary }]}>
-          <Text style={[styles.premiumWarningText, { color: theme.primary }]}>
-            🔒 {t('emotionalTags.premiumRequired')}
-          </Text>
-          {onLearnMore && (
-            <TouchableOpacity onPress={onLearnMore} style={styles.learnMoreButton}>
-              <Text style={[styles.learnMoreText, { color: theme.primary }]}>
-                {t('emotionalTags.learnMore')} →
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : !isV3AlphaModel ? (
-        // Premium user on Standard model: Show auto-switch info
-        <View style={[styles.premiumWarning, { backgroundColor: theme.warning + '20', borderColor: theme.warning }]}>
-          <Text style={[styles.premiumWarningText, { color: theme.warning }]}>
-            ⚠️ {t('emotionalTags.autoSwitchInfo')}
-          </Text>
-          {onLearnMore && (
-            <TouchableOpacity onPress={onLearnMore} style={styles.learnMoreButton}>
-              <Text style={[styles.learnMoreText, { color: theme.warning }]}>
-                {t('emotionalTags.learnMore')} →
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : null}
-
       {/* Scrollable Tag Categories */}
       <ScrollView
         style={[styles.scrollView, { maxHeight }]}
@@ -137,30 +86,21 @@ export const EmotionalTagSelector: React.FC<EmotionalTagSelectorProps> = ({
               {/* Category Tags */}
               {isExpanded && (
                 <View style={[styles.tagsContainer, { backgroundColor: theme.background }]}>
-                  {tags.map(tag => {
-                    // Only lock for non-premium users
-                    const isLocked = !isPremiumUser && tag.requiresPremium;
-                    return (
-                      <TouchableOpacity
-                        key={tag.id}
-                        style={[
-                          styles.tag,
-                          {
-                            backgroundColor: isLocked ? theme.border : theme.primary + '20',
-                            borderColor: isLocked ? theme.border : theme.primary
-                          }
-                        ]}
-                        onPress={() => handleTagPress(tag)}
-                        disabled={isLocked}
-                      >
-                        {tag.icon && <Text style={styles.tagIcon}>{tag.icon}</Text>}
-                        <Text style={[styles.tagLabel, { color: isLocked ? theme.text + '66' : theme.primary }]}>
-                          {t(`emotionalTags.tags.${tag.id}`)}
-                        </Text>
-                        {isLocked && <Text style={styles.lockIcon}>🔒</Text>}
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {tags.map(tag => (
+                    <TouchableOpacity
+                      key={tag.id}
+                      style={[
+                        styles.tag,
+                        { backgroundColor: theme.primary + '20', borderColor: theme.primary }
+                      ]}
+                      onPress={() => onTagSelect(tag)}
+                    >
+                      {tag.icon && <Text style={styles.tagIcon}>{tag.icon}</Text>}
+                      <Text style={[styles.tagLabel, { color: theme.primary }]}>
+                        {t(`emotionalTags.tags.${tag.id}`)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               )}
             </View>
@@ -184,25 +124,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8
-  },
-  premiumWarning: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 12
-  },
-  premiumWarningText: {
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 8
-  },
-  learnMoreButton: {
-    marginTop: 4
-  },
-  learnMoreText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textDecorationLine: 'underline'
   },
   scrollView: {
     marginBottom: 8
@@ -258,9 +179,6 @@ const styles = StyleSheet.create({
   tagLabel: {
     fontSize: 13,
     fontWeight: '500'
-  },
-  lockIcon: {
-    fontSize: 10
   },
   helpText: {
     fontSize: 11,

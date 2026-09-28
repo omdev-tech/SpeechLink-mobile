@@ -481,7 +481,7 @@
     "experimental": "Eksperimentel",
     "selected": "Valgt",
     "premiumRequired": "Kræver INTENSIVE eller DAILY_COMPANION plan",
-    "standardDesc": "Hurtig, pålidelig syntese med 32 sprog",
+    "standardDesc": "Hurtig, pålidelig syntese med 85 sprog",
     "premiumDesc": "Avancerede følelsesmæssige stemmer med over 70 sprog",
     "experimentalWarning": "Denne model er eksperimentel og kan have højere latenstid",
     "characterLimit": "Tegngrænse: {{limit}}",

@@ -856,7 +856,7 @@
     "experimental": "Experimental",
     "selected": "Selectat",
     "premiumRequired": "Necesită planul INTENSIVE sau DAILY_COMPANION",
-    "standardDesc": "Sinteză rapidă și fiabilă cu 32 de limbi",
+    "standardDesc": "Sinteză rapidă și fiabilă cu 85 de limbi",
     "premiumDesc": "Voci emoționale avansate cu peste 70 de limbi",
     "experimentalWarning": "Acest model este experimental și poate avea latență mai mare",
     "characterLimit": "Limită caractere: {{limit}}",

@@ -655,7 +655,7 @@
     "experimental": "Экспериментальная",
     "selected": "Выбрано",
     "premiumRequired": "Требуется план INTENSIVE или DAILY_COMPANION",
-    "standardDesc": "Быстрый, надежный синтез с 32 языками",
+    "standardDesc": "Быстрый, надежный синтез с 85 языками",
     "premiumDesc": "Продвинутые эмоциональные голоса с более чем 70 языками",
     "experimentalWarning": "Эта модель экспериментальная и может иметь более высокую задержку",
     "characterLimit": "Лимит символов: {{limit}}",

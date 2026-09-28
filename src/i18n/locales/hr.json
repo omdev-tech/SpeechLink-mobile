@@ -646,7 +646,7 @@
     "experimental": "Eksperimentalni",
     "selected": "Odabrano",
     "premiumRequired": "Zahtijeva INTENSIVE ili DAILY_COMPANION plan",
-    "standardDesc": "Brza, pouzdana sinteza s 32 jezika",
+    "standardDesc": "Brza, pouzdana sinteza s 85 jezika",
     "premiumDesc": "Napredni emocionalni glasovi s više od 70 jezika",
     "experimentalWarning": "Ovaj model je eksperimentalni i može imati veću latenciju",
     "characterLimit": "Ograničenje znakova: {{limit}}",

@@ -793,7 +793,7 @@
     "experimental": "Experimentální",
     "selected": "Vybráno",
     "premiumRequired": "Vyžaduje plán INTENSIVE nebo DAILY_COMPANION",
-    "standardDesc": "Rychlá, spolehlivá syntéza s 32 jazyky",
+    "standardDesc": "Rychlá, spolehlivá syntéza s 85 jazyky",
     "premiumDesc": "Pokročilé emoční hlasy s více než 70 jazyky",
     "experimentalWarning": "Tento model je experimentální a může mít vyšší latenci",
     "characterLimit": "Limit znaků: {{limit}}",
