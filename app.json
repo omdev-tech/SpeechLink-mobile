@@ -49,7 +49,11 @@
     },
     "ios": {
       "bundleIdentifier": "com.naqued.speechlinkmobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Speech Link uses the microphone to hear your speech and turn it into a clear voice.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "plugins": [
       "./app.plugin.js",
