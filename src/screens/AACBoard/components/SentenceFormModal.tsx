@@ -117,8 +117,8 @@ const SentenceFormModal: React.FC<SentenceFormModalProps> = ({
     
     if (!text.trim()) {
       newErrors.text = t('general.error.required');
-    } else if (text.length > 200) {
-      newErrors.text = t('general.error.maxLength', { max: 200 });
+    } else if (text.length > 5000) {
+      newErrors.text = t('general.error.maxLength', { max: 5000 });
     }
     
     if (!categoryId) {
