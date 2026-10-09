@@ -10,7 +10,7 @@ const STORAGE_KEYS = {
 };
 
 const APP_STORE_LINKS = {
-  ios: 'https://apps.apple.com/app/id6739186003', // Replace with your actual App Store ID
+  ios: 'https://apps.apple.com/app/id6821018127', // App Store Connect app "Speech Link: AAC Voice"
   android: 'market://details?id=com.naqued.speechlinkmobile', // Replace with your actual package name
   androidWeb: 'https://play.google.com/store/apps/details?id=com.naqued.speechlinkmobile',
 };
