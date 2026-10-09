@@ -18,6 +18,7 @@ import { useTextToSpeech } from '../../hooks/useTextToSpeech';
 import { useFeatureGate } from '../../contexts/FeatureGateContext';
 import { useTranslation } from 'react-i18next';
 import { PremiumBadge, UpgradePrompt } from '../UI';
+import { canShowPurchaseOptions } from '../../config/purchases';
 
 interface VoiceDetailModalProps {
   visible: boolean;
@@ -114,6 +115,14 @@ const VoiceDetailModal: React.FC<VoiceDetailModalProps> = ({
         if (isLimitError) {
           setShowSubscriptionError(true);
           
+          if (!canShowPurchaseOptions()) {
+            Alert.alert(
+              t('subscription.noCreditsTitle', 'Credits Exhausted'),
+              t('subscription.noCreditsMessage', "You've used all your credits for this month.")
+            );
+            return;
+          }
+
           // Optional: show an alert with upgrade option
           Alert.alert(
             t('subscription.limitTitle', 'Subscription Limit Reached'),

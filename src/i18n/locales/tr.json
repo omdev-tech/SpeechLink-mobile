@@ -975,5 +975,22 @@
       "continue": "Öğreticiye Devam Et",
       "skip": "Atla"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Hesabı sil",
+      "confirmTitle": "Hesabınız silinsin mi?",
+      "confirmMessage": "Bu işlem hesabınızı ve verilerinizi kalıcı olarak siler: kayıtlı cümleler, ses ayarları, sözlük, Discord bağlantısı ve ses klonları. Etkin abonelikler iptal edilir. Bu işlem geri alınamaz.",
+      "confirm": "Sil",
+      "doneTitle": "Hesap silindi",
+      "doneMessage": "Hesabınız ve verileri silindi.",
+      "error": "Hesabınız silinemedi. Lütfen daha sonra tekrar deneyin.",
+      "subscriptionError": "Aboneliğiniz iptal edilemedi, bu nedenle hesabınız silinmedi. Lütfen daha sonra tekrar deneyin."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Bu özellik mevcut planınıza dahil değil."
+    }
   }
 }

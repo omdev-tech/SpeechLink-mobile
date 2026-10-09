@@ -972,5 +972,22 @@
     "switchSuccess": "Model na binago sa {{model}}",
     "languageRequiresPremium": "Premium na Wika",
     "switchedForLanguage": "Lumipat sa Premium Model (v3) para sa {{language}} na suporta sa wika"
+  },
+  "account": {
+    "delete": {
+      "button": "I-delete ang account",
+      "confirmTitle": "I-delete ang iyong account?",
+      "confirmMessage": "Permanenteng buburahin nito ang iyong account at data: mga naka-save na pangungusap, setting ng boses, diksiyonaryo, koneksyon sa Discord at mga voice clone. Kakanselahin ang anumang aktibong subscription. Hindi na ito maibabalik.",
+      "confirm": "I-delete",
+      "doneTitle": "Na-delete ang account",
+      "doneMessage": "Na-delete na ang iyong account at ang data nito.",
+      "error": "Hindi ma-delete ang iyong account. Pakisubukang muli mamaya.",
+      "subscriptionError": "Hindi makansela ang iyong subscription, kaya hindi na-delete ang iyong account. Pakisubukang muli mamaya."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Hindi kasama ang feature na ito sa kasalukuyan mong plan."
+    }
   }
 }

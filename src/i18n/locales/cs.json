@@ -898,5 +898,22 @@
       "continue": "Pokračovat v Tutoriálu",
       "skip": "Přeskočit"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Smazat účet",
+      "confirmTitle": "Smazat účet?",
+      "confirmMessage": "Tímto trvale smažete svůj účet a data: uložené věty, nastavení hlasu, slovník, propojení s Discordem a klony hlasu. Aktivní předplatné bude zrušeno. Tuto akci nelze vrátit.",
+      "confirm": "Smazat",
+      "doneTitle": "Účet smazán",
+      "doneMessage": "Váš účet a jeho data byla smazána.",
+      "error": "Účet se nepodařilo smazat. Zkuste to prosím později.",
+      "subscriptionError": "Předplatné se nepodařilo zrušit, proto účet nebyl smazán. Zkuste to prosím později."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Tato funkce není součástí vašeho současného tarifu."
+    }
   }
 }

@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { ThemeContext, themes } from '../../contexts/ThemeContext';
+import { canShowPurchaseOptions } from '../../config/purchases';
 
 interface CreditLimitModalProps {
   visible: boolean;
@@ -27,6 +28,8 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
   const { t, i18n } = useTranslation();
   const isDark = theme === themes.dark;
   const styles = makeStyles(isDark);
+  // iOS: no subscribe message or upgrade button (config/purchases).
+  const showPurchase = canShowPurchaseOptions();
 
   const handleUpgrade = () => {
     if (onUpgrade) {
@@ -78,6 +81,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           </Text>
 
           {/* Indie developer message */}
+          {showPurchase && (
           <View style={styles.indieDevContainer}>
             <Ionicons 
               name="heart" 
@@ -89,9 +93,11 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
               {t('subscription.indieDevMessage', 'SpeechLink is made by indie developers. Subscribing helps us keep improving the app and adding new features for people who need it.')}
             </Text>
           </View>
+          )}
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
+            {showPurchase && (
             <TouchableOpacity
               style={styles.upgradeButton}
               onPress={handleUpgrade}
@@ -102,6 +108,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                 {t('subscription.upgrade', 'Upgrade Plan')}
               </Text>
             </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.laterButton}
@@ -109,7 +116,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
               activeOpacity={0.7}
             >
               <Text style={styles.laterButtonText}>
-                {t('subscription.later', 'Maybe Later')}
+                {showPurchase ? t('subscription.later', 'Maybe Later') : t('general.ok', 'OK')}
               </Text>
             </TouchableOpacity>
           </View>

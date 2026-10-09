@@ -975,5 +975,22 @@
       "continue": "Tutorial Verdergaan",
       "skip": "Overslaan"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Account verwijderen",
+      "confirmTitle": "Je account verwijderen?",
+      "confirmMessage": "Hiermee worden je account en je gegevens definitief verwijderd: opgeslagen zinnen, steminstellingen, woordenboek, Discord-koppeling en stemklonen. Een actief abonnement wordt opgezegd. Dit kan niet ongedaan worden gemaakt.",
+      "confirm": "Verwijderen",
+      "doneTitle": "Account verwijderd",
+      "doneMessage": "Je account en de bijbehorende gegevens zijn verwijderd.",
+      "error": "Je account kon niet worden verwijderd. Probeer het later opnieuw.",
+      "subscriptionError": "Je abonnement kon niet worden opgezegd, dus je account is niet verwijderd. Probeer het later opnieuw."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Deze functie zit niet in je huidige abonnement."
+    }
   }
 }

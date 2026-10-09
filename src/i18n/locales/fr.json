@@ -999,5 +999,22 @@
       "continue": "Continuer le tutoriel",
       "skip": "Passer"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Supprimer le compte",
+      "confirmTitle": "Supprimer votre compte ?",
+      "confirmMessage": "Cette action supprime définitivement votre compte et vos données : phrases enregistrées, réglages de voix, dictionnaire, connexion Discord et clones de voix. Tout abonnement actif est résilié. Cette action est irréversible.",
+      "confirm": "Supprimer",
+      "doneTitle": "Compte supprimé",
+      "doneMessage": "Votre compte et ses données ont été supprimés.",
+      "error": "Votre compte n'a pas pu être supprimé. Veuillez réessayer plus tard.",
+      "subscriptionError": "Votre abonnement n'a pas pu être résilié, votre compte n'a donc pas été supprimé. Veuillez réessayer plus tard."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Cette fonctionnalité n'est pas incluse dans votre offre actuelle."
+    }
   }
 }

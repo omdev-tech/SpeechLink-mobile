@@ -899,5 +899,22 @@
       "continue": "Tutorium fortsetzen",
       "skip": "Überspringen"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Konto löschen",
+      "confirmTitle": "Konto löschen?",
+      "confirmMessage": "Dadurch werden dein Konto und deine Daten dauerhaft gelöscht: gespeicherte Sätze, Stimmeinstellungen, Wörterbuch, Discord-Verbindung und Stimmklone. Ein aktives Abonnement wird gekündigt. Dies kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen",
+      "doneTitle": "Konto gelöscht",
+      "doneMessage": "Dein Konto und seine Daten wurden gelöscht.",
+      "error": "Dein Konto konnte nicht gelöscht werden. Bitte versuche es später erneut.",
+      "subscriptionError": "Dein Abonnement konnte nicht gekündigt werden, daher wurde dein Konto nicht gelöscht. Bitte versuche es später erneut."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Diese Funktion ist in deinem aktuellen Tarif nicht enthalten."
+    }
   }
 }

@@ -77,6 +77,8 @@ import { aacService } from '../../services/aacService';
 import { AACPreferences } from '../../models/AAC';
 import webAuthService from '../../services/webAuthService';
 import LogoutEverywhereButton from '../../components/SettingsScreen/LogoutEverywhereButton';
+import DeleteAccountButton from '../../components/SettingsScreen/DeleteAccountButton';
+import { canShowPurchaseOptions } from '../../config/purchases';
 
 const SettingsScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -720,14 +722,16 @@ const SettingsScreen: React.FC = () => {
             undefined,
             () => navigation.navigate('Profile' as never)
           )}
-          <TutorialTarget id="settings-subscription">
-            {renderSettingItem(
-              'card-outline',
-              t('profile.subscription'),
-              undefined,
-              handleSubscriptionPress
-            )}
-          </TutorialTarget>
+          {canShowPurchaseOptions() && (
+            <TutorialTarget id="settings-subscription">
+              {renderSettingItem(
+                'card-outline',
+                t('profile.subscription'),
+                undefined,
+                handleSubscriptionPress
+              )}
+            </TutorialTarget>
+          )}
         </View>
 
         {renderIntegrationSettings()}
@@ -770,6 +774,8 @@ const SettingsScreen: React.FC = () => {
         </TouchableOpacity>
 
         <LogoutEverywhereButton />
+
+        <DeleteAccountButton />
 
         <TouchableOpacity 
           style={styles.bugReportButton} 

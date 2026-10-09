@@ -975,5 +975,22 @@
       "continue": "Continuar Tutorial",
       "skip": "Pular"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Excluir conta",
+      "confirmTitle": "Excluir sua conta?",
+      "confirmMessage": "Isto exclui permanentemente sua conta e seus dados: frases salvas, configurações de voz, dicionário, conexão com o Discord e clones de voz. Qualquer assinatura ativa é cancelada. Esta ação não pode ser desfeita.",
+      "confirm": "Excluir",
+      "doneTitle": "Conta excluída",
+      "doneMessage": "Sua conta e seus dados foram excluídos.",
+      "error": "Não foi possível excluir sua conta. Tente novamente mais tarde.",
+      "subscriptionError": "Não foi possível cancelar sua assinatura, então sua conta não foi excluída. Tente novamente mais tarde."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Este recurso não está incluído no seu plano atual."
+    }
   }
 }

@@ -586,5 +586,22 @@
       "continue": "Pokračovať v Návode",
       "skip": "Preskočiť"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Odstrániť účet",
+      "confirmTitle": "Odstrániť účet?",
+      "confirmMessage": "Týmto natrvalo odstránite svoj účet a údaje: uložené vety, nastavenia hlasu, slovník, prepojenie s Discordom a klony hlasu. Aktívne predplatné bude zrušené. Túto akciu nemožno vrátiť.",
+      "confirm": "Odstrániť",
+      "doneTitle": "Účet odstránený",
+      "doneMessage": "Váš účet a jeho údaje boli odstránené.",
+      "error": "Účet sa nepodarilo odstrániť. Skúste to neskôr.",
+      "subscriptionError": "Predplatné sa nepodarilo zrušiť, preto účet nebol odstránený. Skúste to neskôr."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Táto funkcia nie je súčasťou vášho aktuálneho plánu."
+    }
   }
 }

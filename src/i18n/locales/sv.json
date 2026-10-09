@@ -975,5 +975,22 @@
       "continue": "Fortsätt Tutorial",
       "skip": "Hoppa över"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Radera konto",
+      "confirmTitle": "Radera ditt konto?",
+      "confirmMessage": "Detta raderar ditt konto och dina data permanent: sparade meningar, röstinställningar, ordlista, Discord-anslutning och röstkloner. Ett aktivt abonnemang avslutas. Detta kan inte ångras.",
+      "confirm": "Radera",
+      "doneTitle": "Kontot har raderats",
+      "doneMessage": "Ditt konto och dess data har raderats.",
+      "error": "Ditt konto kunde inte raderas. Försök igen senare.",
+      "subscriptionError": "Ditt abonnemang kunde inte avslutas, så ditt konto raderades inte. Försök igen senare."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Den här funktionen ingår inte i din nuvarande plan."
+    }
   }
 }

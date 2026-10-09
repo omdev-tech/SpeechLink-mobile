@@ -1033,5 +1033,22 @@
       "continue": "Continue Tutorial",
       "skip": "Skip"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Delete account",
+      "confirmTitle": "Delete your account?",
+      "confirmMessage": "This permanently deletes your account and your data: saved sentences, voice settings, dictionary, Discord connection and voice clones. Any active subscription is cancelled. This cannot be undone.",
+      "confirm": "Delete",
+      "doneTitle": "Account deleted",
+      "doneMessage": "Your account and its data have been deleted.",
+      "error": "Your account could not be deleted. Please try again later.",
+      "subscriptionError": "Your subscription could not be cancelled, so your account was not deleted. Please try again later."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "This feature isn't included in your current plan."
+    }
   }
 }

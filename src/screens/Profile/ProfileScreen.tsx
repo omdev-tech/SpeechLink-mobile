@@ -22,6 +22,7 @@ import { ThemeContext } from '../../contexts/ThemeContext';
 import { profileService } from '../../services/profileService';
 import { UserProfile } from '../../types/profile';
 import webAuthService from '../../services/webAuthService';
+import { canShowPurchaseOptions } from '../../config/purchases';
 
 // Plan configuration based on your specifications
 const PLAN_CONFIG = {
@@ -392,7 +393,8 @@ const ProfileScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Subscription plans section */}
+        {/* Subscription plans section (not on iOS: see config/purchases) */}
+        {canShowPurchaseOptions() && (
         <View style={styles.subscriptionSection}>
           <Text style={styles.sectionTitle}>{t('profile.plans.title', 'Subscription Plans')}</Text>
           
@@ -531,6 +533,7 @@ const ProfileScreen: React.FC = () => {
             )}
           </View>
         </View>
+        )}
 
         {isEditing && (
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>

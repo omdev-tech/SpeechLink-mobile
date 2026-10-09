@@ -71,3 +71,17 @@ export async function signInWithApple(): Promise<AppleAuthResult> {
     return { success: false, message: 'Could not reach the server. Check your connection and try again.' };
   }
 }
+
+/**
+ * Re-authorize with Apple to get a fresh one-time authorization code (no scopes requested).
+ * Used before deleting an account that signs in with Apple: the backend exchanges the code and
+ * revokes the app's Apple tokens, as Apple requires.
+ */
+export async function getAppleAuthorizationCode(): Promise<{ code?: string; canceled?: boolean }> {
+  try {
+    const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
+    return credential.authorizationCode ? { code: credential.authorizationCode } : {};
+  } catch (error: any) {
+    return error?.code === 'ERR_REQUEST_CANCELED' ? { canceled: true } : {};
+  }
+}

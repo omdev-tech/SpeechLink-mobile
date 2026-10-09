@@ -64,6 +64,7 @@ import CategoryFormModal from './components/CategoryFormModal';
 import SentenceReorderMode from './components/SentenceReorderMode';
 import DiscordIndicator from '../../components/UI/DiscordIndicator';
 import { CreditLimitModal } from '../../components/UI/CreditLimitModal';
+import { canShowPurchaseOptions } from '../../config/purchases';
 
 // Debug utilities (development only)
 import { quickHindiTest } from '../../utils/debugHindiAPI';
@@ -864,6 +865,13 @@ const AACBoardScreen: React.FC = () => {
       }
       
       // Check if we've reached the subscription limit
+      if (subscriptionLimitReached && !canShowPurchaseOptions()) {
+        Alert.alert(
+          t('subscription.noCreditsTitle', 'Credits Exhausted'),
+          t('subscription.noCreditsMessage', "You've used all your credits for this month.")
+        );
+        return;
+      }
       if (subscriptionLimitReached) {
         Alert.alert(
           t('general.subscriptionRequired'),
@@ -1014,6 +1022,13 @@ const AACBoardScreen: React.FC = () => {
         }
         
         // Check subscription limit
+        if (subscriptionLimitReached && !canShowPurchaseOptions()) {
+          Alert.alert(
+            t('subscription.noCreditsTitle', 'Credits Exhausted'),
+            t('subscription.noCreditsMessage', "You've used all your credits for this month.")
+          );
+          return;
+        }
         if (subscriptionLimitReached) {
           Alert.alert(
             t('general.subscriptionRequired'),
@@ -1659,7 +1674,17 @@ const AACBoardScreen: React.FC = () => {
               </View>
             }
           />          
-          {subscriptionLimitReached && (
+          {subscriptionLimitReached && !canShowPurchaseOptions() && (
+            <View style={styles.limitBanner}>
+              <View style={styles.limitBannerContent}>
+                <Ionicons name="warning-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.limitBannerText}>
+                  {t('subscription.noCreditsMessage', "You've used all your credits for this month.")}
+                </Text>
+              </View>
+            </View>
+          )}
+          {subscriptionLimitReached && canShowPurchaseOptions() && (
             <TouchableOpacity 
               style={styles.limitBanner} 
               onPress={() => {
