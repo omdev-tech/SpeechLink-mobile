@@ -762,5 +762,22 @@
       "continue": "Nastavi Vodič",
       "skip": "Preskoči"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Izbriši račun",
+      "confirmTitle": "Izbrisati račun?",
+      "confirmMessage": "Time se trajno brišu vaš račun i podaci: spremljene rečenice, postavke glasa, rječnik, Discord veza i klonovi glasa. Aktivna pretplata se otkazuje. Ovo se ne može poništiti.",
+      "confirm": "Izbriši",
+      "doneTitle": "Račun izbrisan",
+      "doneMessage": "Vaš račun i njegovi podaci su izbrisani.",
+      "error": "Račun nije moguće izbrisati. Pokušajte ponovno kasnije.",
+      "subscriptionError": "Pretplatu nije bilo moguće otkazati pa račun nije izbrisan. Pokušajte ponovno kasnije."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Ova značajka nije uključena u vaš trenutni plan."
+    }
   }
 }

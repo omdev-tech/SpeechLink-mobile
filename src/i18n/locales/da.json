@@ -586,5 +586,22 @@
       "continue": "Fortsæt Tutorial",
       "skip": "Spring Over"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Slet konto",
+      "confirmTitle": "Slet din konto?",
+      "confirmMessage": "Dette sletter permanent din konto og dine data: gemte sætninger, stemmeindstillinger, ordbog, Discord-forbindelse og stemmekloner. Et aktivt abonnement opsiges. Dette kan ikke fortrydes.",
+      "confirm": "Slet",
+      "doneTitle": "Konto slettet",
+      "doneMessage": "Din konto og dens data er blevet slettet.",
+      "error": "Din konto kunne ikke slettes. Prøv igen senere.",
+      "subscriptionError": "Dit abonnement kunne ikke opsiges, så din konto blev ikke slettet. Prøv igen senere."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Denne funktion er ikke inkluderet i din nuværende plan."
+    }
   }
 }

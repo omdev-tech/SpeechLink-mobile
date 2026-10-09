@@ -586,5 +586,22 @@
     "modalNotCase2": "💬 Komunikasi mudah dan langsung",
     "modalNotCase3": "📊 Pemprosesan teks volum tinggi",
     "modalNotCase4": "💰 Aplikasi sensitif kos"
+  },
+  "account": {
+    "delete": {
+      "button": "Padam akaun",
+      "confirmTitle": "Padam akaun anda?",
+      "confirmMessage": "Tindakan ini memadam akaun dan data anda secara kekal: ayat yang disimpan, tetapan suara, kamus, sambungan Discord dan klon suara. Sebarang langganan aktif akan dibatalkan. Tindakan ini tidak boleh dibuat asal.",
+      "confirm": "Padam",
+      "doneTitle": "Akaun dipadam",
+      "doneMessage": "Akaun anda dan datanya telah dipadam.",
+      "error": "Akaun anda tidak dapat dipadam. Sila cuba lagi kemudian.",
+      "subscriptionError": "Langganan anda tidak dapat dibatalkan, jadi akaun anda tidak dipadam. Sila cuba lagi kemudian."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Ciri ini tidak termasuk dalam pelan semasa anda."
+    }
   }
 }

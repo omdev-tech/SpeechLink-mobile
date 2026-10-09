@@ -899,5 +899,22 @@
       "continue": "继续教程",
       "skip": "跳过"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "删除账户",
+      "confirmTitle": "要删除您的账户吗？",
+      "confirmMessage": "这将永久删除您的账户和数据：已保存的句子、语音设置、词典、Discord 连接和语音克隆。所有有效订阅都将被取消。此操作无法撤销。",
+      "confirm": "删除",
+      "doneTitle": "账户已删除",
+      "doneMessage": "您的账户及其数据已被删除。",
+      "error": "无法删除您的账户，请稍后再试。",
+      "subscriptionError": "无法取消您的订阅，因此您的账户未被删除。请稍后再试。"
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "您当前的套餐不包含此功能。"
+    }
   }
 }

@@ -762,5 +762,22 @@
       "continue": "Jatka Opetusohjelmaa",
       "skip": "Ohita"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Poista tili",
+      "confirmTitle": "Poistetaanko tilisi?",
+      "confirmMessage": "Tämä poistaa pysyvästi tilisi ja tietosi: tallennetut lauseet, ääniasetukset, sanakirjan, Discord-yhteyden ja äänikloonit. Aktiivinen tilaus perutaan. Toimintoa ei voi perua.",
+      "confirm": "Poista",
+      "doneTitle": "Tili poistettu",
+      "doneMessage": "Tilisi ja sen tiedot on poistettu.",
+      "error": "Tiliäsi ei voitu poistaa. Yritä myöhemmin uudelleen.",
+      "subscriptionError": "Tilaustasi ei voitu perua, joten tiliäsi ei poistettu. Yritä myöhemmin uudelleen."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Tämä ominaisuus ei sisälly nykyiseen tilaukseesi."
+    }
   }
 }

@@ -1,3 +1,5 @@
+import { canShowPurchaseOptions } from './purchases';
+
 export type TutorialStepId = 
   | 'welcome'
   | 'createSentence'
@@ -32,7 +34,7 @@ export interface TutorialStep {
   requiresNavigation: boolean; // Does this step need to navigate to a different tab?
 }
 
-export const TUTORIAL_STEPS: TutorialStep[] = [
+const ALL_TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'welcome',
     targetScreen: 'None',
@@ -150,3 +152,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 ];
 
+// The subscription step points at the Settings "Subscription" row, which iOS does not show.
+export const TUTORIAL_STEPS: TutorialStep[] = ALL_TUTORIAL_STEPS.filter(
+  (step) => canShowPurchaseOptions() || step.id !== 'settingsSubscription'
+);

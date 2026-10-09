@@ -1,10 +1,10 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authService, AuthToken } from '../services/authService';
+import { authService, AuthToken, DeleteAccountOutcome } from '../services/authService';
 import { SecureStorageUnavailableError } from '../services/secureStorage';
 import googleAuthService from '../services/googleAuthService';
-import { signInWithApple } from '../services/appleAuthService';
+import { getAppleAuthorizationCode, isAppleSignInAvailable, signInWithApple } from '../services/appleAuthService';
 
 /** Expiry fields of a login / register / Google verify response (all optional). */
 export type TokenExpiryInfo = Pick<AuthToken, 'expires_in' | 'expires_at'>;
@@ -18,6 +18,8 @@ interface AuthContextType {
   canSignOutEverywhere: boolean;
   loginWithGoogle: () => Promise<boolean>;
   loginWithApple: () => Promise<boolean>;
+  /** Delete the account and its data (re-confirms with Apple when the account uses it). */
+  deleteAccount: (lang?: string) => Promise<DeleteAccountOutcome>;
   token: string | null;
   isLoading: boolean;
   authError: string | null;
@@ -31,6 +33,7 @@ export const AuthContext = createContext<AuthContextType>({
   canSignOutEverywhere: false,
   loginWithGoogle: async () => false,
   loginWithApple: async () => false,
+  deleteAccount: async () => ({ status: 'failed', code: 'NO_PROVIDER' }),
   token: null,
   isLoading: true,
   authError: null,
@@ -277,6 +280,25 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     return true;
   };
 
+  const deleteAccount = async (lang?: string): Promise<DeleteAccountOutcome> => {
+    let outcome = await authService.deleteAccount({ lang });
+    if (outcome.status === 'appleReauthRequired') {
+      if (await isAppleSignInAvailable()) {
+        const apple = await getAppleAuthorizationCode();
+        if (apple.canceled) return { status: 'canceled' };
+        if (!apple.code) return { status: 'failed', code: 'APPLE_REAUTH_FAILED' };
+        outcome = await authService.deleteAccount({ lang, appleAuthorizationCode: apple.code });
+      } else {
+        outcome = await authService.deleteAccount({ lang, appleUnavailable: true });
+      }
+    }
+    if (outcome.status === 'deleted') {
+      userTokenRef.current = null;
+      setUserToken(null);
+    }
+    return outcome;
+  };
+
   const authContext = {
     signIn,
     signOut,
@@ -284,6 +306,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     canSignOutEverywhere,
     loginWithGoogle,
     loginWithApple,
+    deleteAccount,
     token: userToken,
     isLoading,
     authError,

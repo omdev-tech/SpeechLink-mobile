@@ -975,5 +975,22 @@
       "continue": "Kontynuuj Samouczek",
       "skip": "Pomiń"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Usuń konto",
+      "confirmTitle": "Usunąć konto?",
+      "confirmMessage": "Spowoduje to trwałe usunięcie konta i danych: zapisanych zdań, ustawień głosu, słownika, połączenia z Discordem i klonów głosu. Aktywna subskrypcja zostanie anulowana. Tej operacji nie można cofnąć.",
+      "confirm": "Usuń",
+      "doneTitle": "Konto usunięte",
+      "doneMessage": "Twoje konto i jego dane zostały usunięte.",
+      "error": "Nie udało się usunąć konta. Spróbuj ponownie później.",
+      "subscriptionError": "Nie udało się anulować subskrypcji, więc konto nie zostało usunięte. Spróbuj ponownie później."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Ta funkcja nie jest dostępna w Twoim obecnym planie."
+    }
   }
 }

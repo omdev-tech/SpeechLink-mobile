@@ -899,5 +899,22 @@
       "continue": "Continuar Tutorial",
       "skip": "Saltar"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Eliminar cuenta",
+      "confirmTitle": "¿Eliminar tu cuenta?",
+      "confirmMessage": "Esto elimina de forma permanente tu cuenta y tus datos: frases guardadas, ajustes de voz, diccionario, conexión con Discord y clones de voz. Cualquier suscripción activa se cancela. Esta acción no se puede deshacer.",
+      "confirm": "Eliminar",
+      "doneTitle": "Cuenta eliminada",
+      "doneMessage": "Tu cuenta y sus datos han sido eliminados.",
+      "error": "No se pudo eliminar tu cuenta. Inténtalo de nuevo más tarde.",
+      "subscriptionError": "No se pudo cancelar tu suscripción, por lo que tu cuenta no se ha eliminado. Inténtalo de nuevo más tarde."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Esta función no está incluida en tu plan actual."
+    }
   }
 }

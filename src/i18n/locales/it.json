@@ -899,5 +899,22 @@
       "continue": "Continua Tutorial",
       "skip": "Salta"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Elimina account",
+      "confirmTitle": "Eliminare il tuo account?",
+      "confirmMessage": "Questa operazione elimina definitivamente il tuo account e i tuoi dati: frasi salvate, impostazioni della voce, dizionario, connessione Discord e cloni vocali. Qualsiasi abbonamento attivo viene annullato. L'operazione è irreversibile.",
+      "confirm": "Elimina",
+      "doneTitle": "Account eliminato",
+      "doneMessage": "Il tuo account e i relativi dati sono stati eliminati.",
+      "error": "Non è stato possibile eliminare il tuo account. Riprova più tardi.",
+      "subscriptionError": "Non è stato possibile annullare il tuo abbonamento, quindi il tuo account non è stato eliminato. Riprova più tardi."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Questa funzione non è inclusa nel tuo piano attuale."
+    }
   }
 }

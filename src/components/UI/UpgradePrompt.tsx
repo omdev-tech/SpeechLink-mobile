@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-
 import { MaterialIcons } from '@expo/vector-icons';
 import { ThemeContext, themes } from '../../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { canShowPurchaseOptions } from '../../config/purchases';
 
 interface UpgradePromptProps {
   title?: string;
@@ -56,8 +57,14 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
 
   const config = sizeConfig[size];
 
-  const defaultTitle = title || t('upgrade.premiumFeature', 'Premium Access Required');
-  const defaultMessage = message || t('upgrade.upgradeMessage', 'This premium voice requires an upgraded plan. Unlock access to all premium voices and enhanced features.');
+  // iOS: no upgrade wording or button (config/purchases); callers' upgrade copy is not shown.
+  const showPurchase = canShowPurchaseOptions();
+  const defaultTitle = showPurchase
+    ? title || t('upgrade.premiumFeature', 'Premium Access Required')
+    : t('upgrade.premiumFeature', 'Premium Access Required');
+  const defaultMessage = showPurchase
+    ? message || t('upgrade.upgradeMessage', 'This premium voice requires an upgraded plan. Unlock access to all premium voices and enhanced features.')
+    : t('purchases.ios.notInPlan', "This feature isn't included in your current plan.");
   const defaultCtaText = ctaText || t('upgrade.upgradeNow', 'View Plans');
 
   const handleUpgradePress = () => {
@@ -108,6 +115,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
         </View>
       </View>
       
+      {showPurchase && (
       <TouchableOpacity style={styles.ctaButton} onPress={handleUpgradePress}>
         <Text style={[styles.ctaText, { fontSize: config.ctaFontSize }]}>
           {defaultCtaText}
@@ -119,6 +127,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
           style={styles.ctaIcon}
         />
       </TouchableOpacity>
+      )}
     </View>
   );
 };

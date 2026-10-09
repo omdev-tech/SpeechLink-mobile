@@ -972,5 +972,22 @@
       "continue": "Continuă Tutorialul",
       "skip": "Omită"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Șterge contul",
+      "confirmTitle": "Ștergi contul?",
+      "confirmMessage": "Această acțiune șterge definitiv contul și datele tale: propoziții salvate, setări de voce, dicționar, conexiunea Discord și clonele de voce. Orice abonament activ este anulat. Acțiunea nu poate fi anulată.",
+      "confirm": "Șterge",
+      "doneTitle": "Cont șters",
+      "doneMessage": "Contul tău și datele sale au fost șterse.",
+      "error": "Contul nu a putut fi șters. Încearcă din nou mai târziu.",
+      "subscriptionError": "Abonamentul nu a putut fi anulat, așa că contul nu a fost șters. Încearcă din nou mai târziu."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Această funcție nu este inclusă în planul tău actual."
+    }
   }
 }

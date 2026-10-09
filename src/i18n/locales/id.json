@@ -975,5 +975,22 @@
       "continue": "Lanjutkan Tutorial",
       "skip": "Lewati"
     }
+  },
+  "account": {
+    "delete": {
+      "button": "Hapus akun",
+      "confirmTitle": "Hapus akun Anda?",
+      "confirmMessage": "Tindakan ini menghapus akun dan data Anda secara permanen: kalimat tersimpan, pengaturan suara, kamus, koneksi Discord, dan klon suara. Langganan aktif akan dibatalkan. Tindakan ini tidak dapat dibatalkan.",
+      "confirm": "Hapus",
+      "doneTitle": "Akun dihapus",
+      "doneMessage": "Akun Anda dan datanya telah dihapus.",
+      "error": "Akun Anda tidak dapat dihapus. Silakan coba lagi nanti.",
+      "subscriptionError": "Langganan Anda tidak dapat dibatalkan, sehingga akun Anda tidak dihapus. Silakan coba lagi nanti."
+    }
+  },
+  "purchases": {
+    "ios": {
+      "notInPlan": "Fitur ini tidak termasuk dalam paket Anda saat ini."
+    }
   }
 }

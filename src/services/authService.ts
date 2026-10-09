@@ -59,6 +59,19 @@ type RawRefresh =
   | { kind: 'failed'; generation: number }; // any other non-2xx, malformed 200
 
 /** The backend has no /api/auth/logout-all yet (404). */
+export interface DeleteAccountRequest {
+  appleAuthorizationCode?: string;
+  appleUnavailable?: boolean;
+  lang?: string;
+}
+
+export type DeleteAccountOutcome =
+  | { status: 'deleted' }
+  | { status: 'appleReauthRequired' }
+  /** The user closed the Apple confirmation sheet: nothing was deleted, nothing to report. */
+  | { status: 'canceled' }
+  | { status: 'failed'; code: string };
+
 export class LogoutEverywhereUnavailableError extends Error {
   constructor() {
     super('logout-all is not available on this server');
@@ -415,6 +428,37 @@ class AuthService {
       throw new Error(`logout-all failed: ${response.status}`);
     }
     await this.clearToken();
+  }
+
+  /**
+   * Delete the account and its data: DELETE /api/account. On success the local session is cleared.
+   * 'appleReauthRequired': the account signs in with Apple and the backend needs a fresh Apple
+   * authorization code (or appleUnavailable on devices that cannot sign in with Apple).
+   */
+  public async deleteAccount(body: DeleteAccountRequest = {}): Promise<DeleteAccountOutcome> {
+    const token = await this.getToken();
+    if (!token?.access_token) return { status: 'failed', code: 'NOT_SIGNED_IN' };
+    let response: Response;
+    try {
+      response = await fetch(`${API_CONFIG.BASE_URL}/api/account`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Type': 'mobile-app',
+          Authorization: `Bearer ${token.access_token}`,
+        },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      return { status: 'failed', code: 'NETWORK' };
+    }
+    const data = await response.json().catch(() => ({} as Record<string, unknown>));
+    if (response.ok) {
+      await this.clearToken();
+      return { status: 'deleted' };
+    }
+    if (response.status === 409 && data?.code === 'APPLE_REAUTH_REQUIRED') return { status: 'appleReauthRequired' };
+    return { status: 'failed', code: typeof data?.code === 'string' ? data.code : `HTTP_${response.status}` };
   }
 
   /** Whether the backend that issued the current token supports logging out everywhere. */
