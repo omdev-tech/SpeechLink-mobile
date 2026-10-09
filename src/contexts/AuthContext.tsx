@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService, AuthToken } from '../services/authService';
 import { SecureStorageUnavailableError } from '../services/secureStorage';
 import googleAuthService from '../services/googleAuthService';
+import { signInWithApple } from '../services/appleAuthService';
 
 /** Expiry fields of a login / register / Google verify response (all optional). */
 export type TokenExpiryInfo = Pick<AuthToken, 'expires_in' | 'expires_at'>;
@@ -16,6 +17,7 @@ interface AuthContextType {
   /** The backend that issued this session supports logging out everywhere (hide the UI otherwise). */
   canSignOutEverywhere: boolean;
   loginWithGoogle: () => Promise<boolean>;
+  loginWithApple: () => Promise<boolean>;
   token: string | null;
   isLoading: boolean;
   authError: string | null;
@@ -28,6 +30,7 @@ export const AuthContext = createContext<AuthContextType>({
   signOutEverywhere: async () => {},
   canSignOutEverywhere: false,
   loginWithGoogle: async () => false,
+  loginWithApple: async () => false,
   token: null,
   isLoading: true,
   authError: null,
@@ -262,12 +265,25 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
+  // Native Sign in with Apple (iOS)
+  const loginWithApple = async (): Promise<boolean> => {
+    setAuthError(null);
+    const result = await signInWithApple();
+    if (!result.success) {
+      if (!result.canceled) setAuthError(result.message || 'Apple sign-in failed');
+      return false;
+    }
+    await signIn(result.access_token!, result);
+    return true;
+  };
+
   const authContext = {
     signIn,
     signOut,
     signOutEverywhere,
     canSignOutEverywhere,
     loginWithGoogle,
+    loginWithApple,
     token: userToken,
     isLoading,
     authError,

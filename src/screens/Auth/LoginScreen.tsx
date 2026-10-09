@@ -22,7 +22,8 @@ import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Context
-import { ThemeContext } from '../../contexts/ThemeContext';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { ThemeContext, themes } from '../../contexts/ThemeContext';
 import { AuthContext } from '../../contexts/AuthContext';
 
 // Components
@@ -33,6 +34,7 @@ import { AuthStackParamList } from '../../navigation/AuthNavigator';
 
 // Services
 import { authService } from '../../services/authService';
+import { isAppleSignInAvailable } from '../../services/appleAuthService';
 
 type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -42,7 +44,13 @@ const LoginScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { theme } = useContext(ThemeContext);
-  const { signIn, authError } = useContext(AuthContext);
+  const { signIn, authError, loginWithApple } = useContext(AuthContext);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  // Sign in with Apple: iOS only (App Store guideline 4.8 when Google sign-in is offered)
+  useEffect(() => {
+    isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -239,6 +247,19 @@ const LoginScreen: React.FC = () => {
               </View>
               
               <View style={styles.socialButtonsContainer}>
+                {appleAvailable && (
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={
+                      theme === themes.dark
+                        ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                        : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                    }
+                    cornerRadius={10}
+                    style={styles.appleButtonStyle}
+                    onPress={loginWithApple}
+                  />
+                )}
                 <GoogleAuthButton 
                   onSuccess={handleGoogleSignInSuccess}
                   onError={handleGoogleSignInError}
@@ -418,8 +439,9 @@ const makeStyles = (theme: any) => StyleSheet.create({
   googleButton: {
     backgroundColor: '#DB4437',
   },
-  appleButton: {
-    backgroundColor: '#000000',
+  appleButtonStyle: {
+    width: '100%',
+    height: 55,
   },
   socialButtonText: {
     color: '#FFFFFF',
