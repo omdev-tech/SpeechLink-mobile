@@ -45,11 +45,12 @@ export const MODEL_CONFIG: Record<string, ModelMetadata> = {
 };
 
 /**
- * Map a saved/unknown model ID to one the app supports.
- * Legacy IDs (e.g. 'eleven_flash_v2_5', which reads tags aloud) resolve to the default.
+ * The model every request uses: v4 Turbo for all plans, whatever is saved in settings
+ * (legacy 'eleven_flash_v2_5' / 'eleven_v3' choices included). The backend falls back to v3
+ * if v4 Turbo fails.
  */
-export function resolveModelId(modelId?: string | null): string {
-  return modelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? modelId : VOICE_MODELS.ELEVEN_LABS;
+export function resolveModelId(_modelId?: string | null): string {
+  return VOICE_MODELS.ELEVEN_LABS;
 }
 
 export function getModelConfig(modelId: string): ModelMetadata {
