@@ -30,8 +30,6 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../components/UI/ToastProvider';
 import { ScreenHeader } from '../../components/UI/ScreenHeader';
 import { PremiumBadge, UpgradePrompt } from '../../components/UI';
-import { ModelSelector } from '../../components/ModelSelector';
-import { canUseElevenV3 } from '../../utils/subscriptionUtils';
 
 const VoiceSettingsScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -193,20 +191,6 @@ const VoiceSettingsScreen: React.FC = () => {
       });
     } catch (err) {
       Alert.alert('Error', 'Failed to update enhancement setting');
-    }
-  };
-
-  const handleModelChange = async (modelId: string) => {
-    if (!userSettings?.voiceSettings) return;
-    
-    try {
-      await updateVoiceSettings({
-        ...userSettings.voiceSettings,
-        modelId
-      });
-      Alert.alert('Success', 'Voice model updated successfully');
-    } catch (err) {
-      Alert.alert('Error', 'Failed to update voice model');
     }
   };
 
@@ -394,21 +378,7 @@ const VoiceSettingsScreen: React.FC = () => {
               thumbColor={userSettings?.voiceSettings?.enhancementEnabled ? theme.primary : '#f4f3f4'}
             />
           </View>
-          
-          {/* Voice Model Selection (Premium Only) */}
-          {canUseElevenV3(profileData?.subscription?.tier) && (
-            <>
-              <View style={styles.sectionDivider} />
-              <View style={[styles.settingItem, { backgroundColor: theme.card }]}>
-                <Text style={[styles.settingLabel, { color: theme.text }]}>Voice Model</Text>
-              </View>
-              <ModelSelector
-                selectedModel={userSettings?.voiceSettings?.modelId}
-                onModelChange={handleModelChange}
-                theme={theme}
-              />
-            </>
-          )}
+
         </View>
         
         <View style={styles.section}>

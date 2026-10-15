@@ -34,14 +34,10 @@ import { useTextToSpeech } from '../../hooks/useTextToSpeech';
 import { useVoiceSettings } from '../../hooks/useVoiceSettings';
 import { aacService } from '../../services/aacService';
 
-// New components for emotional tags & model selection
-import { ModelSelector } from '../../components/ModelSelector';
+// Emotional tags (every plan; v4 Turbo is the only model)
 import { EmotionalTagSelector } from '../../components/EmotionalTagSelector';
-import { ModelInfoModal } from '../../components/ModelInfoModal';
-import { ModelSelectionModal } from '../../components/ModelSelectionModal';
-import { VOICE_MODELS, getCharacterLimit, resolveModelId } from '../../utils/voiceModels';
+import { getCharacterLimit, resolveModelId } from '../../utils/voiceModels';
 import { insertTagAtPosition, EmotionalTag } from '../../utils/emotionalTags';
-import { canUseElevenV3 } from '../../utils/subscriptionUtils';
 
 // Tutorial
 import { TutorialTarget } from '../../components/Tutorial/TutorialTarget';
@@ -83,9 +79,6 @@ const TypingModal: React.FC<{
   onStop: () => void;
   theme: any;
   t: any;
-  userPlanId?: string;
-  savedModelId?: string;
-  onModelChange?: (modelId: string) => Promise<void>;
 }> = React.memo(({
   visible,
   onClose,
@@ -98,32 +91,17 @@ const TypingModal: React.FC<{
   onClear,
   onStop,
   theme,
-  t,
-  userPlanId,
-  savedModelId,
-  onModelChange
+  t
 }) => {
   const styles = makeTypingModalStyles(theme);
   
   // State for cursor position and tags visibility
   const [cursorPosition, setCursorPosition] = React.useState(0);
   const [showTags, setShowTags] = React.useState(false);
-  const [showModelInfo, setShowModelInfo] = React.useState(false);
   const inputRef = React.useRef<TextInput>(null);
   
-  // Use saved model from database, fallback to default
-  const selectedModel = resolveModelId(savedModelId);
-  
-  // Get character limit based on selected model
-  const characterLimit = getCharacterLimit(selectedModel);
-  const isPremium = userPlanId ? canUseElevenV3(userPlanId) : false;
-  
-  // Debug: Log user plan info
-  React.useEffect(() => {
-    console.log('[TypingModal] User Plan ID:', userPlanId);
-    console.log('[TypingModal] Is Premium:', isPremium);
-    console.log('[TypingModal] Can use Eleven V3:', canUseElevenV3(userPlanId || ''));
-  }, [userPlanId, isPremium]);
+  // Every user speaks with v4 Turbo (the backend falls back to v3 on failure)
+  const characterLimit = getCharacterLimit(resolveModelId());
   
   // Handle tag insertion (every model supports tags, no model switch needed)
   const handleTagSelect = (tag: EmotionalTag) => {
@@ -133,28 +111,6 @@ const TypingModal: React.FC<{
     setCursorPosition(result.newCursorPosition);
     // Focus back on input
     setTimeout(() => inputRef.current?.focus(), 100);
-  };
-  
-  // Handle model change - save to database
-  const handleModelChange = async (modelId: string) => {
-    // If text exceeds new model's limit, show warning
-    if (customMessage.length > getCharacterLimit(modelId)) {
-      Alert.alert(
-        t('general.warning') || 'Warning',
-        `The ${modelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? 'Premium' : 'Standard'} model supports up to ${getCharacterLimit(modelId)} characters. Your text will be truncated.`,
-        [{ text: 'OK' }]
-      );
-    }
-    
-    // Save to database
-    if (onModelChange) {
-      await onModelChange(modelId);
-    }
-  };
-  
-  // Handle learn more button
-  const handleLearnMore = () => {
-    setShowModelInfo(true);
   };
   
   return (
@@ -185,13 +141,6 @@ const TypingModal: React.FC<{
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.content}>
-              {/* Model Selector - Show to all users */}
-              <ModelSelector
-                selectedModel={selectedModel}
-                onModelChange={handleModelChange}
-                theme={theme}
-              />
-              
               {/* Text Input */}
               <View style={styles.inputContainer}>
                 <TextInput
@@ -233,8 +182,6 @@ const TypingModal: React.FC<{
                     onTagSelect={handleTagSelect}
                     theme={theme}
                     maxHeight={200}
-                    onLearnMore={handleLearnMore}
-                    selectedModel={selectedModel}
                   />
                   
                   {/* Emotional Tags Tip */}
@@ -299,13 +246,6 @@ const TypingModal: React.FC<{
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-      
-      {/* Model Info Modal */}
-      <ModelInfoModal
-        visible={showModelInfo}
-        onClose={() => setShowModelInfo(false)}
-        theme={theme}
-      />
     </Modal>
   );
 });
@@ -538,15 +478,8 @@ const AACBoardScreen: React.FC = () => {
   const [subscriptionLimitReached, setSubscriptionLimitReached] = useState(false);
   const [creditLimitModalVisible, setCreditLimitModalVisible] = useState(false);
   
-  // Check if user has premium access for v3 model
-  const userPlanId = profileData?.subscription?.tier;
-  const hasPremiumAccess = userPlanId ? canUseElevenV3(userPlanId) : false;
-  const currentModelId = resolveModelId(userSettings?.voiceSettings?.modelId);
-  
   // Modal state
   const [sentenceFormVisible, setSentenceFormVisible] = useState(false);
-  const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
-  const [modelInfoVisible, setModelInfoVisible] = useState(false);
   const [editingSentence, setEditingSentence] = useState<SentenceUIModel | undefined>(undefined);
   const [categoryFormVisible, setCategoryFormVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryUIModel | undefined>(undefined);
@@ -995,23 +928,6 @@ const AACBoardScreen: React.FC = () => {
     });
   };
 
-  // Handler for saving model selection to database
-  const handleModelChange = useCallback(async (modelId: string) => {
-    try {
-      // Partial update: only send the modelId field
-      // Backend will update only this field for existing settings
-      await updateVoiceSettings({
-        modelId
-      } as any);
-      console.log('[AACBoard] Model saved to database:', modelId);
-      
-      // Note: Modal closing and success message is handled by ModelSelectionModal component
-    } catch (error) {
-      console.error('[AACBoard] Failed to save model selection:', error);
-      throw error; // Let the modal handle the error display
-    }
-  }, [updateVoiceSettings]);
-
   const speakCustomMessage = async () => {
     if (customMessage.trim()) {
       try {
@@ -1081,9 +997,6 @@ const AACBoardScreen: React.FC = () => {
             }, 1000);
           }
         }
-        
-        // Get saved modelId from user settings (with fallback)
-        const savedModelId = userSettings?.voiceSettings?.modelId;
         
         // Speak the message directly with modelId in settings
         await speak(customMessage, undefined, undefined, currentLanguage);
@@ -1595,26 +1508,6 @@ const AACBoardScreen: React.FC = () => {
             title={""}
             rightComponent={
               <View style={styles.headerActions}>
-                  {/* Model Selector - Only show for premium users */}
-                  {hasPremiumAccess && (
-                  <TouchableOpacity 
-                    style={[styles.headerButton, styles.modelSelectorButton]} 
-                    onPress={() => setModelSelectorVisible(true)}
-                  >
-                    <View style={styles.modelIconContainer}>
-                      <Ionicons 
-                        name={currentModelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? 'sparkles' : 'flash'} 
-                        size={24} 
-                        color={theme.primary} 
-                      />
-                      <View style={[styles.modelBadge, { backgroundColor: currentModelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? '#FFD700' : theme.primary }]}>
-                        <Text style={styles.modelBadgeText}>
-                          {currentModelId === VOICE_MODELS.ELEVEN_LABS_PREMIUM ? 'v3' : 'v4'}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                )}
                 <TouchableOpacity 
                   style={styles.headerButton} 
                   onPress={async () => {
@@ -2091,29 +1984,6 @@ const AACBoardScreen: React.FC = () => {
         onStop={handleStopSpeaking}
         theme={theme}
         t={t}
-        userPlanId={profileData?.subscription?.tier}
-        savedModelId={userSettings?.voiceSettings?.modelId}
-        onModelChange={handleModelChange}
-      />
-      
-      {/* Model Selection Modal */}
-      <ModelSelectionModal
-        visible={modelSelectorVisible}
-        onClose={() => setModelSelectorVisible(false)}
-        selectedModel={currentModelId}
-        onModelChange={handleModelChange}
-        onLearnMore={() => {
-          setModelSelectorVisible(false);
-          setModelInfoVisible(true);
-        }}
-        theme={theme}
-      />
-      
-      {/* Model Info Modal */}
-      <ModelInfoModal
-        visible={modelInfoVisible}
-        onClose={() => setModelInfoVisible(false)}
-        theme={theme}
       />
       
       {/* Credit Limit Modal */}
@@ -2166,28 +2036,6 @@ const makeStyles = (theme: any) => StyleSheet.create({
   },
   headerButton: {
     padding: 8,
-  },
-  modelSelectorButton: {
-    position: 'relative',
-  },
-  modelIconContainer: {
-    position: 'relative',
-  },
-  modelBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 8,
-    minWidth: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modelBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: 'bold',
   },
   categoriesContainer: {
     height: 90,

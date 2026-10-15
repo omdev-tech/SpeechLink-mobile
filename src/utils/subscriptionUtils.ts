@@ -29,12 +29,8 @@ export function canUseEmotionalTags(_planId: string): boolean {
   return true; // Available on every plan since v4 Turbo is the default model
 }
 
-export function getAvailableModels(planId: string): string[] {
-  const models: string[] = [VOICE_MODELS.ELEVEN_LABS];
-  if (isPremiumPlan(planId)) {
-    models.push(VOICE_MODELS.ELEVEN_LABS_PREMIUM);
-  }
-  return models;
+export function getAvailableModels(_planId: string): string[] {
+  return [VOICE_MODELS.ELEVEN_LABS]; // v4 Turbo for every plan
 }
 
 export function getUpgradeMessage(feature: string): string {
