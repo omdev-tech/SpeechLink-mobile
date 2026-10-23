@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Context
 import { ThemeContext } from '../../../contexts/ThemeContext';
@@ -35,6 +36,9 @@ import { ColorPicker } from '../../../components/AAC/ColorPicker';
 import { EmotionalTagSelector } from '../../../components/EmotionalTagSelector';
 import { insertTagAtPosition, EmotionalTag } from '../../../utils/emotionalTags';
 
+// Saved sentences: same limit as the backend (was 200)
+const MAX_SENTENCE_LENGTH = 5000;
+
 interface SentenceFormModalProps {
   visible: boolean;
   onClose: () => void;
@@ -54,6 +58,7 @@ const SentenceFormModal: React.FC<SentenceFormModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const { theme } = useContext(ThemeContext);
+  const insets = useSafeAreaInsets();
   
   const [text, setText] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -117,8 +122,8 @@ const SentenceFormModal: React.FC<SentenceFormModalProps> = ({
     
     if (!text.trim()) {
       newErrors.text = t('general.error.required');
-    } else if (text.length > 5000) {
-      newErrors.text = t('general.error.maxLength', { max: 5000 });
+    } else if (text.length > MAX_SENTENCE_LENGTH) {
+      newErrors.text = t('general.error.maxLength', { max: MAX_SENTENCE_LENGTH });
     }
     
     if (!categoryId) {
@@ -213,7 +218,7 @@ const SentenceFormModal: React.FC<SentenceFormModalProps> = ({
             </View>
             
             <ScrollView 
-              style={styles.content}
+              contentContainerStyle={styles.content}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
@@ -372,11 +377,11 @@ const SentenceFormModal: React.FC<SentenceFormModalProps> = ({
                   />
                 </TouchableOpacity>
                 {showEmotionalTags && (
-                  <View style={styles.pickerContainer}>
+                  <View style={styles.tagsPickerContainer}>
                     <EmotionalTagSelector
                       onTagSelect={handleTagSelect}
                       theme={theme}
-                      maxHeight={300}
+                      maxHeight={240}
                     />
                   </View>
                 )}
@@ -395,18 +400,18 @@ const SentenceFormModal: React.FC<SentenceFormModalProps> = ({
                   placeholder={t('aacBoard.enterPhraseText')}
                   placeholderTextColor={theme.text + '60'}
                   multiline
-                  maxLength={200}
+                  maxLength={MAX_SENTENCE_LENGTH}
                 />
                 {errors.text ? (
                   <Text style={styles.errorText}>{errors.text}</Text>
                 ) : null}
                 <Text style={styles.charCounter}>
-                  {text.length}/200
+                  {text.length}/{MAX_SENTENCE_LENGTH}
                 </Text>
               </View>
             </ScrollView>
             
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: 16 + insets.bottom }]}>
               <TouchableOpacity 
                 style={styles.cancelButton} 
                 onPress={onClose}
@@ -467,6 +472,7 @@ const makeStyles = (theme: any) => StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 24,
   },
   formGroup: {
     marginBottom: 20,
@@ -633,6 +639,10 @@ const makeStyles = (theme: any) => StyleSheet.create({
     borderColor: theme.border,
     maxHeight: 400,
     overflow: 'hidden',
+  },
+  // No height cap here: the selector scrolls its own list, so a cap would clip its title and help text
+  tagsPickerContainer: {
+    marginTop: 8,
   },
 });
 
