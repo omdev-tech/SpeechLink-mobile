@@ -1050,5 +1050,22 @@
     "ios": {
       "notInPlan": "This feature isn't included in your current plan."
     }
+  },
+  "aiConsent": {
+    "title": "Your data and AI",
+    "intro": "Speech Link uses AI services from other companies to work. When you use a feature, the data it needs is sent to these providers, who process it on our behalf:",
+    "speechTitle": "Speech recognition",
+    "speechText": "Your voice recordings are sent to ElevenLabs (backups: Deepgram, OpenAI, Speechmatics) to turn them into text.",
+    "correctionTitle": "Text correction",
+    "correctionText": "The transcribed text is sent to Mistral AI (backup: OpenAI) to turn it into clear sentences.",
+    "voiceTitle": "Voice generation",
+    "voiceText": "The text to speak is sent to ElevenLabs (backup: OpenAI) to read it aloud.",
+    "note": "Nothing is sent until you agree. You can stop at any time by deleting your account in Settings.",
+    "privacyLink": "Read our privacy policy",
+    "accept": "I agree",
+    "decline": "I do not agree",
+    "declineTitle": "Continue without agreeing?",
+    "declineMessage": "Speech Link cannot transcribe, correct or speak your sentences without these services. You will be signed out; sign in again whenever you want to agree.",
+    "saveError": "Your choice could not be saved. Please try again."
   }
 }

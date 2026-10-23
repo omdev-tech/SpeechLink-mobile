@@ -1016,5 +1016,22 @@
     "ios": {
       "notInPlan": "Cette fonctionnalité n'est pas incluse dans votre offre actuelle."
     }
+  },
+  "aiConsent": {
+    "title": "Vos données et l'IA",
+    "intro": "Speech Link utilise des services d'IA d'autres entreprises pour fonctionner. Quand vous utilisez une fonctionnalité, les données nécessaires sont envoyées à ces prestataires, qui les traitent pour notre compte :",
+    "speechTitle": "Reconnaissance vocale",
+    "speechText": "Vos enregistrements vocaux sont envoyés à ElevenLabs (secours : Deepgram, OpenAI, Speechmatics) pour être transcrits en texte.",
+    "correctionTitle": "Correction du texte",
+    "correctionText": "Le texte transcrit est envoyé à Mistral AI (secours : OpenAI) pour être reformulé en phrases claires.",
+    "voiceTitle": "Génération de la voix",
+    "voiceText": "Le texte à prononcer est envoyé à ElevenLabs (secours : OpenAI) pour être lu à voix haute.",
+    "note": "Rien n'est envoyé avant votre accord. Vous pouvez arrêter à tout moment en supprimant votre compte dans les Réglages.",
+    "privacyLink": "Lire notre politique de confidentialité",
+    "accept": "J'accepte",
+    "decline": "Je refuse",
+    "declineTitle": "Continuer sans accepter ?",
+    "declineMessage": "Speech Link ne peut pas transcrire, corriger ni prononcer vos phrases sans ces services. Vous allez être déconnecté ; reconnectez-vous quand vous souhaitez accepter.",
+    "saveError": "Votre choix n'a pas pu être enregistré. Veuillez réessayer."
   }
 }
