@@ -12,6 +12,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.WritableNativeMap
+import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.io.File
 
 class AudioOutputModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -27,6 +28,24 @@ class AudioOutputModule(reactContext: ReactApplicationContext) : ReactContextBas
   override fun getName(): String {
     return "AudioOutput"
   }
+
+  // Notify JS that native playback ended (naturally or on error) so the UI can leave its "playing" state.
+  private fun emitPlaybackComplete() {
+    try {
+      reactApplicationContext
+        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+        .emit("onAudioPlaybackComplete", null)
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to emit playback complete event: ${e.message}", e)
+    }
+  }
+
+  // Required by NativeEventEmitter on the JS side.
+  @ReactMethod
+  fun addListener(eventName: String) {}
+
+  @ReactMethod
+  fun removeListeners(count: Int) {}
 
   @ReactMethod
   fun forceSpeaker(promise: Promise) {
@@ -214,13 +233,15 @@ class AudioOutputModule(reactContext: ReactApplicationContext) : ReactContextBas
         setOnCompletionListener {
           Log.d(TAG, "✅ Audio playback completed")
           stopAudio()
+          emitPlaybackComplete()
         }
         
         // Set error listener
         setOnErrorListener { _, what, extra ->
           Log.e(TAG, "❌ MediaPlayer error: what=$what, extra=$extra")
           stopAudio()
-          false
+          emitPlaybackComplete()
+          true // handled: don't also fire the completion listener
         }
         
         // Start playback

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeContext } from '../../contexts/ThemeContext';
 
 interface AddEditEntryModalProps {
@@ -39,6 +40,7 @@ const AddEditEntryModal: React.FC<AddEditEntryModalProps> = ({
   const { t } = useTranslation();
   const { theme } = useContext(ThemeContext);
   const styles = makeStyles(theme);
+  const insets = useSafeAreaInsets();
 
   const [word, setWord] = useState(initialWord);
   const [pronunciation, setPronunciation] = useState(initialPronunciation);
@@ -109,7 +111,8 @@ const AddEditEntryModal: React.FC<AddEditEntryModalProps> = ({
           activeOpacity={1}
           onPress={handleClose}
         />
-        <View style={styles.modalContent}>
+        {/* Bottom inset keeps the action buttons above the Android nav bar (edge-to-edge) / iOS home indicator */}
+        <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -261,7 +264,6 @@ const makeStyles = (theme: any) =>
       backgroundColor: theme.background,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
-      paddingBottom: Platform.OS === 'ios' ? 34 : 20,
       maxHeight: '90%',
     },
     modalHeader: {

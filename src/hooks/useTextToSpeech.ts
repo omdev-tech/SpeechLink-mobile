@@ -137,9 +137,11 @@ export const useTextToSpeech = (): UseTextToSpeechResult => {
   useEffect(() => {
     const loadAudioRoutingPreference = async () => {
       try {
-        // Load from local storage (device-specific preference)
-        const savedRouting = await AsyncStorage.getItem('audioRoutingEnabled');
-        const routingEnabled = savedRouting ? JSON.parse(savedRouting) : false;
+        // Audio routing to the microphone is hidden in the UI: its native module
+        // (utils/audio/ExpoModules.ts) is still a mock that plays nothing. Force it off so a
+        // preference saved before the toggle was hidden can't silence playback.
+        const routingEnabled = false;
+        await AsyncStorage.setItem('audioRoutingEnabled', JSON.stringify(false));
         
         // Initialize the audio routing service with this value
         await audioRoutingService.setAudioRoutingEnabled(routingEnabled);
@@ -184,9 +186,15 @@ export const useTextToSpeech = (): UseTextToSpeechResult => {
         console.error('Error stopping sound:', error);
       }
       setCurrentSound(null);
-      setIsPlaying(false);
     }
-    
+
+    // Android speaker mode plays through the native MediaPlayer (no Expo Sound object),
+    // so it must be stopped explicitly.
+    if (Platform.OS === 'android' && nativeAudioOutput.isAvailable()) {
+      await nativeAudioOutput.stopAudio();
+    }
+    setIsPlaying(false);
+
     // Also stop any audio routing
     audioRoutingService.stopAudioRouting();
   }, [currentSound]);
@@ -264,7 +272,9 @@ export const useTextToSpeech = (): UseTextToSpeechResult => {
         // Create a dummy sound to satisfy the return type
         const dummySound = new Audio.Sound();
         setCurrentSound(null);
-        setIsPlaying(true);
+        // Routing is fire-and-forget with no completion signal: don't report "playing",
+        // otherwise the UI would stay stuck in its playing state.
+        setIsPlaying(false);
         return dummySound;
       } else {
         // Normal flow using the TTS service
@@ -551,7 +561,9 @@ export const useTextToSpeech = (): UseTextToSpeechResult => {
         // Create a dummy sound to satisfy the return type
         const dummySound = new Audio.Sound();
         setCurrentSound(null);
-        setIsPlaying(true);
+        // Routing is fire-and-forget with no completion signal: don't report "playing",
+        // otherwise the UI would stay stuck in its playing state.
+        setIsPlaying(false);
         
         // Only now clear the loading state after audio routing has begun
         setIsLoading(false);
