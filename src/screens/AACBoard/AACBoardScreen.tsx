@@ -788,10 +788,15 @@ const AACBoardScreen: React.FC = () => {
   const speakPhrase = async (text: string, phraseId?: string) => {
     try {
       if (isSpeaking) {
-        handleStopSpeaking();
-        return;
+        // Tapping the sentence that is playing (or tapping anything while audio is still
+        // loading) stops playback. Tapping a different sentence while one is playing
+        // switches to it: generateSpeech() stops the current audio before playing the new one.
+        if (isLoadingAudio || currentlyPlayingText === text) {
+          handleStopSpeaking();
+          return;
+        }
       }
-      
+
       // Don't speak empty text
       if (!text.trim()) {
         return;
