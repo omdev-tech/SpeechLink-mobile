@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { withDangerousMod, withMainApplication } = require('expo/config-plugins');
+const { withDangerousMod, withMainApplication, withAndroidManifest } = require('expo/config-plugins');
 
 // Custom Android native module (AudioOutput: force speaker / earpiece routing).
 // Sources live outside android/ so they survive `expo prebuild --clean`.
@@ -48,6 +48,27 @@ const withAudioOutputPackage = (config) =>
     return cfg;
   });
 
+// Google Play infers *required* hardware features from permissions and activity
+// orientation (ACCESS_WIFI_STATE -> android.hardware.wifi, a portrait-locked
+// activity -> android.hardware.screen.portrait), which blocks installs on devices
+// without them. Declare both explicitly as optional.
+const OPTIONAL_FEATURES = ['android.hardware.wifi', 'android.hardware.screen.portrait'];
+
+const withOptionalHardwareFeatures = (config) =>
+  withAndroidManifest(config, (cfg) => {
+    const manifest = cfg.modResults.manifest;
+    manifest['uses-feature'] = manifest['uses-feature'] || [];
+    for (const name of OPTIONAL_FEATURES) {
+      const existing = manifest['uses-feature'].find((f) => f.$['android:name'] === name);
+      if (existing) {
+        existing.$['android:required'] = 'false';
+      } else {
+        manifest['uses-feature'].push({ $: { 'android:name': name, 'android:required': 'false' } });
+      }
+    }
+    return cfg;
+  });
+
 module.exports = (config) => {
   if (!config.android) {
     config.android = {};
@@ -71,5 +92,6 @@ module.exports = (config) => {
 
   config = withAudioOutputSources(config);
   config = withAudioOutputPackage(config);
+  config = withOptionalHardwareFeatures(config);
   return config;
 };
